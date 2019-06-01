@@ -27,6 +27,12 @@ oledFill(0x0);
     oledSetPixel(x, y, 1);
   }
   delay(2000);
+//
+// By default, the line drawing function is disabled on AVR since it requires a backing buffer (1K RAM)
+// Which is usually a large % on most of the AVRs (Arduino UNO only has 2K RAM total)
+// To enable this functionality, define USE_BACKBUFFER at the beginning of ss_oled.cpp
+//
+#ifndef __AVR__
   oledFill(0);
   for (x=0; x<127; x+=2)
   {
@@ -36,5 +42,6 @@ oledFill(0x0);
   {
     oledDrawLine(127,y, 0,63-y);
   }
-  delay(3000);
+  delay(2000);
+#endif // !__AVR__
 } /* main() */
