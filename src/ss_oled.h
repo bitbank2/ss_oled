@@ -10,12 +10,20 @@ enum {
   OLED_64x32
 };
 
+// Return value from oledInit()
+enum {
+  OLED_NOT_FOUND = -1, // no display found
+  OLED_SSD1306_3C,  // SSD1306 found at 0x3C
+  OLED_SSD1306_3D,  // SSD1306 found at 0x3D
+  OLED_SH1106_3C,   // SH1106 found at 0x3C
+  OLED_SH1106_3D,   // SH1106 found at 0x3D
+};
 //
 // Initializes the OLED controller into "page mode" on I2C
 // If SDAPin and SCLPin are not -1, then bit bang I2C on those pins
 // Otherwise use the Wire library
 //
-void oledInit(int iAddr, int iType, int bFlip, int bInvert, int iSDAPin, int iSCLPin, int32_t iSpeed);
+int oledInit(int iType, int bFlip, int bInvert, int iSDAPin, int iSCLPin, int32_t iSpeed);
 //
 // Initialize an SPI version of the display
 //

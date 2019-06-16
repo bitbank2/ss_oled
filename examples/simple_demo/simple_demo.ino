@@ -4,9 +4,17 @@
 #include <ss_oled.h>
 
 void setup() {
+int rc;
   // put your setup code here, to run once:
-oledInit(0x3c, OLED_128x64, 0, 0, -1, -1,400000L); // use standard I2C bus at 400Khz
-//oledInit(0x3c, OLED_128x64, 0, 0, 0xb0, 0xb2, 400000L); // for ATtiny85, use P0 as SDA and P2 as SCL
+rc = oledInit(OLED_128x64, 0, 0, -1, -1,400000L); // use standard I2C bus at 400Khz
+//rc = oledInit(OLED_128x64, 0, 0, 0xb0, 0xb2, 400000L); // for ATtiny85, use P0 as SDA and P2 as SCL
+  if (rc != OLED_NOT_FOUND)
+  {
+    char *msgs[] = {"SSD1306 @ 0x3C", "SSD1306 @ 0x3D","SH1106 @ 0x3C","SH1106 @ 0x3D"};
+    oledFill(0);
+    oledWriteString(0,0,msgs[rc], FONT_NORMAL, 0);
+    delay(2000);
+  }
 }
 
 void loop() {
@@ -14,7 +22,7 @@ void loop() {
 int i, x, y;
 char szTemp[32];
 
-oledFill(0x0);
+  oledFill(0x0);
   oledWriteString(16,0,"ss_oled Demo", FONT_NORMAL, 0);
   oledWriteString(0,1,"Written by Larry Bank", FONT_SMALL, 1);
   oledWriteString(0,3,"**Demo**", FONT_LARGE, 0);

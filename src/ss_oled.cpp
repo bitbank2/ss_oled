@@ -701,11 +701,11 @@ int iLen;
 //
 // Initializes the OLED controller into "page mode"
 //
-void oledInit(int iAddr, int iType, int bFlip, int bInvert, int sda, int scl, int32_t iSpeed)
+int oledInit(int iType, int bFlip, int bInvert, int sda, int scl, int32_t iSpeed)
 {
 unsigned char uc[4];
+int rc = OLED_NOT_FOUND;
 
-  oled_addr = iAddr;
   oled_type = iType;
   oled_flip = bFlip;
   iSDAPin = sda;
@@ -716,14 +716,53 @@ unsigned char uc[4];
 if (sda != -1 && scl != -1)
 {
   I2CInit(sda, scl, iSpeed);
+  // find the device address
+  oled_addr = 0;
+  if (I2CTest(0x3c))
+     oled_addr = 0x3c;
+  else if (I2CTest(0x3d))
+     oled_addr = 0x3d;
+  else return rc; // no display found!
 }
 #ifndef __AVR_ATtiny85__
 else
 {
+uint8_t err;
+
   Wire.begin(); // Initiate the Wire library
   Wire.setClock(iSpeed); // use high speed I2C mode (default is 100Khz)
+  // find the device address
+  Wire.beginTransmission(0x3c);
+  err = Wire.endTransmission();
+  if (err == 0) // a device responded
+     oled_addr = 0x3c;
+  else
+  {
+    Wire.beginTransmission(0x3d);
+    err = Wire.endTransmission();
+    if (err == 0)
+       oled_addr = 0x3d;
+    else
+       return rc; // no display found!
+  }
 }
 #endif
+  // Detect the display controller (SSD1306 or SH1106)
+  uint8_t u = 0;
+  I2CReadRegister(oled_addr, 0x00, &u, 1); // read the status register
+  u &= 0xbf; // mask off power on/off bit
+  if (u == 0x8) // SH1106
+  {
+    rc = OLED_SH1106_3C;
+    oled_type = OLED_132x64; // needs to be treated a little differently
+  }
+  else if (u == 3 || u == 6)
+  {
+    rc = OLED_SSD1306_3C;
+  }
+  if (oled_addr == 0x3d)
+     rc++; // return the '3D' version of the type
+
   if (iType == OLED_128x32)
      _I2CWrite((unsigned char *)oled32_initbuf, sizeof(oled32_initbuf));
   else // 132x64, 128x64 and 64x32
@@ -742,6 +781,7 @@ else
     uc[1] = 0xc0;
     _I2CWrite(uc, 2);
   }
+  return rc;
 } /* oledInit() */
 //
 // Sends a command to turn on or off the OLED display
