@@ -749,7 +749,24 @@ uint8_t err;
 #endif
   // Detect the display controller (SSD1306 or SH1106)
   uint8_t u = 0;
-  I2CReadRegister(oled_addr, 0x00, &u, 1); // read the status register
+  if (sda != -1 && scl != -1)
+  {
+    I2CReadRegister(oled_addr, 0x00, &u, 1); // read the status register
+  }
+#ifndef __AVR_ATtiny85__
+  else
+  {
+    Wire.beginTransmission(oled_addr);
+    Wire.write(0);
+    Wire.endTransmission();
+    Wire.requestFrom(oled_addr, 1);
+    while (!Wire.available())
+    {
+      delay(1);
+    }
+    u = Wire.read();
+  }
+#endif
   u &= 0xbf; // mask off power on/off bit
   if (u == 0x8) // SH1106
   {
