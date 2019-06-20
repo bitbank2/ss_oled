@@ -7,7 +7,8 @@ enum {
   OLED_128x32 = 1,
   OLED_128x64,
   OLED_132x64,
-  OLED_64x32
+  OLED_64x32,
+  OLED_96x16
 };
 
 // Return value from oledInit()
@@ -76,3 +77,8 @@ void oledDumpBuffer(uint8_t *pBuffer);
 // Draw a line between 2 points
 //
 void oledDrawLine(int x1, int y1, int x2, int y2);
+//
+// Get the buffer pointer for direct manipulation of the pixels
+//
+uint8_t * oledGetBuffer(void);
+

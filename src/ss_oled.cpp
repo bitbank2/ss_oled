@@ -531,6 +531,7 @@ static int iScreenOffset; // current write offset of screen data
 static unsigned char ucScreen[1024]; // local copy of the image buffer
 #endif
 static int oled_flip, oled_addr, oled_type;
+static uint8_t oled_x, oled_y; // width and height of the display
 static int iSDAPin, iSCLPin;
 #define MAX_CACHE 32
 static byte bCache[MAX_CACHE] = {0x40}; // for faster character drawing
@@ -667,7 +668,7 @@ int iLen;
 //  SPI.setBitOrder(MSBFIRST);
 //  SPI.setDataMode(SPI_MODE0);
 
-  if (iType == OLED_128x32)
+  if (iType == OLED_128x32 || iType == OLED_96x16)
   {
      s = (uint8_t *)oled32_initbuf;
      iLen = sizeof(oled32_initbuf);
@@ -780,7 +781,7 @@ uint8_t err;
   if (oled_addr == 0x3d)
      rc++; // return the '3D' version of the type
 
-  if (iType == OLED_128x32)
+  if (iType == OLED_128x32 || iType == OLED_96x16)
      _I2CWrite((unsigned char *)oled32_initbuf, sizeof(oled32_initbuf));
   else // 132x64, 128x64 and 64x32
      _I2CWrite((unsigned char *)oled64_initbuf, sizeof(oled64_initbuf));
@@ -797,6 +798,20 @@ uint8_t err;
     _I2CWrite(uc, 2);
     uc[1] = 0xc0;
     _I2CWrite(uc, 2);
+  }
+  oled_x = 128; // assume 128x64
+  oled_y = 64;
+  if (iType == OLED_96x16)
+  {
+    oled_x = 96;
+    oled_y = 16;
+  }
+  else if (iType == OLED_128x32)
+    oled_y = 32;
+  else if (iType == OLED_64x32)
+  {
+    oled_x = 64;
+    oled_y = 32;
   }
   return rc;
 } /* oledInit() */
@@ -845,7 +860,7 @@ void oledSetContrast(unsigned char ucContrast)
 //
 static void oledSetPosition(int x, int y)
 {
-unsigned char buf[8];
+unsigned char buf[4];
 
 #ifdef USE_BACKBUFFER 
   iScreenOffset = (y*128)+x;
@@ -859,6 +874,13 @@ unsigned char buf[8];
   else if (oled_type == OLED_132x64) // SH1106 has 128 pixels centered in 132
   {
     x += 2;
+  }
+  else if (oled_type == OLED_96x16) // visible display starts at line 2
+  { // mapping is a bit strange on the 96x16 OLED
+    if (oled_flip)
+      x += 32;
+    else
+      y += 2;
   }
   buf[0] = 0x00; // command introducer
   buf[1] = 0xb0 | y; // set page to Y
@@ -1042,7 +1064,7 @@ unsigned char c, *s, ucTemp[40];
     if (iSize == FONT_NORMAL) // 8x8 font
     {
        i = 0;
-       while (x < 128-7 && szMsg[i] != 0)
+       while (x < oled_x-7 && szMsg[i] != 0)
        {
          c = (unsigned char)szMsg[i];
          iFontOff = (int)(c-32) * 8;
@@ -1059,7 +1081,7 @@ unsigned char c, *s, ucTemp[40];
     else if (iSize == FONT_LARGE) // 16x32 font
     {
       i = 0;
-      while (x < 128-15 && szMsg[i] != 0)
+      while (x < oled_x-15 && szMsg[i] != 0)
       {
 // stretch the 'normal' font instead of using the big font
 #ifdef __AVR__
@@ -1128,7 +1150,7 @@ unsigned char c, *s, ucTemp[40];
     else if (iSize == FONT_SMALL) // 6x8 font
     {
        i = 0;
-       while (x < 128-5 && szMsg[i] != 0)
+       while (x < oled_x-5 && szMsg[i] != 0)
        {
          c = szMsg[i] - 32;
          // we can't directly use the pointer to FLASH memory, so copy to a local buffer
@@ -1157,8 +1179,8 @@ uint8_t bNeedPos;
 uint8_t *pSrc = ucScreen;
 #endif
 
-  iLines = (oled_type == OLED_128x32 || oled_type == OLED_64x32) ? 4:8;
-  iCols = (oled_type == OLED_64x32) ? 4:8;
+  iLines = oled_y >> 3;
+  iCols = oled_x >> 4;
   for (y=0; y<iLines; y++)
   {
     bNeedPos = 1; // start of a new line means we need to set the position too
@@ -1199,8 +1221,8 @@ uint8_t x, y;
 uint8_t iLines, iCols;
 unsigned char temp[16];
 
-  iLines = (oled_type == OLED_128x32 || oled_type == OLED_64x32) ? 4:8;
-  iCols = (oled_type == OLED_64x32) ? 4:8;
+  iLines = oled_y >> 3;
+  iCols = oled_x >> 4;
   memset(temp, ucData, 16);
  
   for (y=0; y<iLines; y++)
@@ -1217,6 +1239,16 @@ unsigned char temp[16];
 } /* oledFill() */
 
 #ifdef USE_BACKBUFFER
+//
+// Return the pointer to the internal back buffer
+// this allows a sketch to do direct manipulation of the pixels
+// and later use oledDumpBuffer() to draw the updated display
+//
+uint8_t * oledGetBuffer(void)
+{
+  return (uint8_t *)&ucScreen[0];
+} /* oledGetBuffer() */
+
 void oledDrawLine(int x1, int y1, int x2, int y2)
 {
   int temp, i;

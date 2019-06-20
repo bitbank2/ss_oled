@@ -23,9 +23,9 @@ int i, x, y;
 char szTemp[32];
 
   oledFill(0x0);
-  oledWriteString(16,0,"ss_oled Demo", FONT_NORMAL, 0);
-  oledWriteString(0,1,"Written by Larry Bank", FONT_SMALL, 1);
-  oledWriteString(0,3,"**Demo**", FONT_LARGE, 0);
+  oledWriteString(16,0,(char *)"ss_oled Demo", FONT_NORMAL, 0);
+  oledWriteString(0,1,(char *)"Written by Larry Bank", FONT_SMALL, 1);
+  oledWriteString(0,3,(char *)"**Demo**", FONT_LARGE, 0);
   delay(2000);
   oledFill(0);
   for (i=0; i<3000; i++)
