@@ -520,6 +520,7 @@ const byte ucSmallFont[]PROGMEM = {
 const unsigned char oled64_initbuf[]={0x00,0xae,0xa8,0x3f,0xd3,0x00,0x40,0xa1,0xc8,
       0xda,0x12,0x81,0xff,0xa4,0xa6,0xd5,0x80,0x8d,0x14,
       0xaf,0x20,0x02};
+
 const unsigned char oled32_initbuf[] = {
 0x00,0xae,0xd5,0x80,0xa8,0x1f,0xd3,0x00,0x40,0x8d,0x14,0xa1,0xc8,0xda,0x02,
 0x81,0x7f,0xd9,0xf1,0xdb,0x40,0xa4,0xa6,0xaf};
@@ -758,7 +759,7 @@ uint8_t err;
   else
   {
     Wire.beginTransmission(oled_addr);
-    Wire.write(0);
+    Wire.write((uint8_t)0);
     Wire.endTransmission();
     Wire.requestFrom(oled_addr, 1);
     while (!Wire.available())
@@ -768,13 +769,13 @@ uint8_t err;
     u = Wire.read();
   }
 #endif
-  u &= 0xbf; // mask off power on/off bit
+  u &= 0x0f; // mask off power on/off bit
   if (u == 0x8) // SH1106
   {
     rc = OLED_SH1106_3C;
     oled_type = OLED_132x64; // needs to be treated a little differently
   }
-  else if (u == 3 || u == 6)
+  else if (u == 3 || u == 6) // 6=128x64 display, 3=smaller
   {
     rc = OLED_SSD1306_3C;
   }
@@ -783,7 +784,7 @@ uint8_t err;
 
   if (iType == OLED_128x32 || iType == OLED_96x16)
      _I2CWrite((unsigned char *)oled32_initbuf, sizeof(oled32_initbuf));
-  else // 132x64, 128x64 and 64x32
+  else // 132x64, 128x64 and 64x32, 72x40
      _I2CWrite((unsigned char *)oled64_initbuf, sizeof(oled64_initbuf));
   if (bInvert)
   {
@@ -812,6 +813,11 @@ uint8_t err;
   {
     oled_x = 64;
     oled_y = 32;
+  }
+  else if (iType == OLED_72x40)
+  {
+    oled_x = 72;
+    oled_y = 40;
   }
   return rc;
 } /* oledInit() */
@@ -881,6 +887,14 @@ unsigned char buf[4];
       x += 32;
     else
       y += 2;
+  }
+  else if (oled_type == OLED_72x40) // starts at x=28,y=3
+  {
+    x += 28;
+    if (!oled_flip)
+    {
+      y += 3;
+    }
   }
   buf[0] = 0x00; // command introducer
   buf[1] = 0xb0 | y; // set page to Y
@@ -1071,12 +1085,12 @@ unsigned char c, *s, ucTemp[40];
          // we can't directly use the pointer to FLASH memory, so copy to a local buffer
          memcpy_P(ucTemp, &ucFont[iFontOff], 8);
          if (bInvert) InvertBytes(ucTemp, 8);
-         oledCachedWrite(ucTemp, 8);
-//         oledWriteDataBlock(ucTemp, 8); // write character pattern
+//         oledCachedWrite(ucTemp, 8);
+         oledWriteDataBlock(ucTemp, 8); // write character pattern
          x += 8;
          i++;
        }
-    oledCachedFlush(); // write any remaining data
+//    oledCachedFlush(); // write any remaining data
     }
     else if (iSize == FONT_LARGE) // 16x32 font
     {
@@ -1156,12 +1170,12 @@ unsigned char c, *s, ucTemp[40];
          // we can't directly use the pointer to FLASH memory, so copy to a local buffer
          memcpy_P(ucTemp, &ucSmallFont[(int)c*6], 6);
          if (bInvert) InvertBytes(ucTemp, 6);
-//         oledWriteDataBlock(ucTemp, 6); // write character pattern
-         oledCachedWrite(ucTemp, 6);
+         oledWriteDataBlock(ucTemp, 6); // write character pattern
+//         oledCachedWrite(ucTemp, 6);
          x += 6;
          i++;
        }
-    oledCachedFlush(); // write any remaining data      
+//    oledCachedFlush(); // write any remaining data      
     }
   return 0;
 } /* oledWriteString() */
@@ -1251,7 +1265,7 @@ uint8_t * oledGetBuffer(void)
 
 void oledDrawLine(int x1, int y1, int x2, int y2)
 {
-  int temp, i;
+  int temp;
   int dx = x2 - x1;
   int dy = y2 - y1;
   int error;

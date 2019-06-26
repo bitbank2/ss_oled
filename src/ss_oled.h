@@ -8,7 +8,8 @@ enum {
   OLED_128x64,
   OLED_132x64,
   OLED_64x32,
-  OLED_96x16
+  OLED_96x16,
+  OLED_72x40
 };
 
 // Return value from oledInit()
