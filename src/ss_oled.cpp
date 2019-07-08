@@ -565,39 +565,10 @@ static void _I2CWrite(unsigned char *pData, int iLen)
   }
   else // must be I2C
   {
-    if (iSDAPin != -1 && iSCLPin != -1)
-    {
-       I2CWrite(oled_addr, pData, iLen);
-    }
-    else
-    {
-       Wire.beginTransmission(oled_addr);
-       Wire.write(pData, iLen);
-       Wire.endTransmission();
-    }
+    I2CWrite(oled_addr, pData, iLen);
   } // I2C
 } /* _I2CWrite() */
 #endif // !__AVR_ATtiny85__
-
-// For SH1106 read_modify_write() operation
-static void _I2CRead(unsigned char *pData, int iLen)
-{
-    if (iSDAPin != -1 && iSCLPin != -1)
-    {  
-       I2CRead(oled_addr, pData, iLen);
-    }
-#ifndef __AVR_ATtiny85__
-    else
-    {  
-       Wire.requestFrom(oled_addr, iLen);
-       while (iLen)
-       {
-         *pData++ = Wire.read();
-         iLen--;
-       }
-    }
-#endif
-} /* _I2CRead() */
 
 static void oledCachedFlush(void)
 {
@@ -951,7 +922,7 @@ unsigned char uc, ucOld;
 //     Wire.read(); // dummy byte
 //     uc = ucOld = Wire.read(); // data we care about
      // read a dummy byte followed by the data byte we want
-     _I2CRead(ucTemp, 2);
+     I2CRead(ucTemp, 2);
      uc = ucOld = ucTemp[1]; // first byte is garbage 
   }
   else
