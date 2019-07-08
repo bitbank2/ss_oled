@@ -24,7 +24,6 @@
 #endif
 #include <BitBang_I2C.h>
 #ifndef __AVR_ATtiny85__
-#include <Wire.h>
 #include <SPI.h>
 #endif
 #include <ss_oled.h>
@@ -539,13 +538,6 @@ static byte bCache[MAX_CACHE] = {0x40}; // for faster character drawing
 static byte bEnd = 1;
 static void oledWriteCommand(unsigned char c);
 
-// use only the bitbang version on ATtiny85 to avoid linking wire library
-#ifdef __AVR_ATtiny85__
-static void _I2CWrite(unsigned char *pData, int iLen)
-{
-  I2CWrite(oled_addr, pData, iLen);
-} /* _I2CWrite() */
-#else
 // Wrapper function to write I2C data on Arduino
 static void _I2CWrite(unsigned char *pData, int iLen)
 {
@@ -568,7 +560,6 @@ static void _I2CWrite(unsigned char *pData, int iLen)
     I2CWrite(oled_addr, pData, iLen);
   } // I2C
 } /* _I2CWrite() */
-#endif // !__AVR_ATtiny85__
 
 static void oledCachedFlush(void)
 {
@@ -686,8 +677,6 @@ int rc = OLED_NOT_FOUND;
 // Disable SPI mode code
   iCSPin = iDCPin = iResetPin = -1;
 
-if (sda != -1 && scl != -1)
-{
   I2CInit(sda, scl, iSpeed);
   // find the device address
   oled_addr = 0;
@@ -696,50 +685,9 @@ if (sda != -1 && scl != -1)
   else if (I2CTest(0x3d))
      oled_addr = 0x3d;
   else return rc; // no display found!
-}
-#ifndef __AVR_ATtiny85__
-else
-{
-uint8_t err;
-
-  Wire.begin(); // Initiate the Wire library
-  Wire.setClock(iSpeed); // use high speed I2C mode (default is 100Khz)
-  // find the device address
-  Wire.beginTransmission(0x3c);
-  err = Wire.endTransmission();
-  if (err == 0) // a device responded
-     oled_addr = 0x3c;
-  else
-  {
-    Wire.beginTransmission(0x3d);
-    err = Wire.endTransmission();
-    if (err == 0)
-       oled_addr = 0x3d;
-    else
-       return rc; // no display found!
-  }
-}
-#endif
   // Detect the display controller (SSD1306 or SH1106)
   uint8_t u = 0;
-  if (sda != -1 && scl != -1)
-  {
-    I2CReadRegister(oled_addr, 0x00, &u, 1); // read the status register
-  }
-#ifndef __AVR_ATtiny85__
-  else
-  {
-    Wire.beginTransmission(oled_addr);
-    Wire.write((uint8_t)0);
-    Wire.endTransmission();
-    Wire.requestFrom(oled_addr, 1);
-    while (!Wire.available())
-    {
-      delay(1);
-    }
-    u = Wire.read();
-  }
-#endif
+  I2CReadRegister(oled_addr, 0x00, &u, 1); // read the status register
   u &= 0x0f; // mask off power on/off bit
   if (u == 0x8) // SH1106
   {
@@ -918,11 +866,8 @@ unsigned char uc, ucOld;
      ucTemp[2] = 0xC0; // one data
      _I2CWrite(ucTemp, 3);
 
-//     Wire.requestFrom(oled_addr, 2);
-//     Wire.read(); // dummy byte
-//     uc = ucOld = Wire.read(); // data we care about
      // read a dummy byte followed by the data byte we want
-     I2CRead(ucTemp, 2);
+     I2CRead(oled_addr, ucTemp, 2);
      uc = ucOld = ucTemp[1]; // first byte is garbage 
   }
   else
@@ -946,14 +891,11 @@ unsigned char uc, ucOld;
     uint8_t ucTemp[4];
       ucTemp[0] = 0xc0; // one data
       ucTemp[1] = uc;   // actual data
-      _I2CWrite(ucTemp, 2);
       ucTemp[2] = 0x80; // one command
       ucTemp[3] = 0xEE; // end read_modify_write operation
-      _I2CWrite(&ucTemp[2], 2);
     }
 #endif
   }
-  return 0;
 } /* oledSetPixel() */
 
 //
