@@ -896,6 +896,7 @@ unsigned char uc, ucOld;
     }
 #endif
   }
+  return 0;
 } /* oledSetPixel() */
 
 //
