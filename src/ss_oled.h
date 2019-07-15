@@ -1,6 +1,10 @@
-#define FONT_NORMAL 0
-#define FONT_LARGE 1
-#define FONT_SMALL 2
+// 4 possible font sizes: 8x8, 16x32, 6x8, 16x16 (stretched from 8x8)
+enum {
+   FONT_NORMAL = 0,
+   FONT_LARGE,
+   FONT_SMALL,
+   FONT_STRETCHED
+};
 
 // OLED type for init function
 enum {

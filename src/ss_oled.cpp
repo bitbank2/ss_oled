@@ -93,7 +93,6 @@ const byte ucBigFont[]PROGMEM = {
   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
   0x00,0x00,0x00,0x00,0xfc,0xfc,0xff,0xff,0xff,0xff,0xfc,0xfc,0x00,0x00,0x00,0x00,
   0x00,0x00,0x00,0x00,0x00,0x00,0x3f,0x3f,0x3f,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,
   0x00,0x00,0x00,0x00,0x00,0x00,0x0f,0x0f,0x0f,0x0f,0x00,0x00,0x00,0x00,0x00,0x00,
@@ -1003,49 +1002,16 @@ unsigned char c, *s, ucTemp[40];
          oledWriteDataBlock(ucTemp, 8); // write character pattern
          x += 8;
          i++;
-       }
-//    oledCachedFlush(); // write any remaining data
-    }
+       } // while
+//     oledCachedFlush(); // write any remaining data
+       return 0;
+    } // 8x8
+#ifndef __AVR__
     else if (iSize == FONT_LARGE) // 16x32 font
     {
       i = 0;
       while (x < oled_x-15 && szMsg[i] != 0)
       {
-// stretch the 'normal' font instead of using the big font
-#ifdef __AVR__
-          int tx, ty;
-          c = szMsg[i] - 32;
-          unsigned char uc1, uc2, ucMask, *pDest;
-          s = (unsigned char *)&ucFont[(int)c*8];
-          memcpy_P(ucTemp, s, 8);
-          if (bInvert)
-              InvertBytes(ucTemp, 8);
-          // Stretch the font to double width + double height
-          memset(&ucTemp[8], 0, 32); // write 32 new bytes
-          for (tx=0; tx<8; tx++)
-          {
-              ucMask = 3;
-              pDest = &ucTemp[8+tx*2];
-              uc1 = uc2 = 0;
-              c = ucTemp[tx];
-              for (ty=0; ty<4; ty++)
-              {
-                  if (c & (1 << ty)) // a bit is set
-                      uc1 |= ucMask;
-                  if (c & (1 << (ty + 4)))
-                      uc2 |= ucMask;
-                  ucMask <<= 2;
-              }
-              pDest[0] = uc1;
-              pDest[1] = uc1; // double width
-              pDest[16] = uc2;
-              pDest[17] = uc2;
-          }
-          oledSetPosition(x, y);
-          oledWriteDataBlock(&ucTemp[8], 16);
-          oledSetPosition(x, y+1);
-          oledWriteDataBlock(&ucTemp[24], 16);
-#else
           s = (unsigned char *)&ucBigFont[(unsigned char)(szMsg[i]-32)*64];
           // we can't directly use the pointer to FLASH memory, so copy to a local buffer
           oledSetPosition(x, y);
@@ -1070,11 +1036,55 @@ unsigned char c, *s, ucTemp[40];
              if (bInvert) InvertBytes(ucTemp, 16);
              oledWriteDataBlock(ucTemp, 16); // write character pattern
           }
-#endif // !__AVR__
           x += 16;
           i++;
-       }
-    }
+       } // while
+       return 0;
+    } // 16x32
+#endif // !__AVR__
+    else if (iSize == FONT_STRETCHED) // 8x8 stretched to 16x16
+    {
+      i = 0;
+      while (x < oled_x-15 && szMsg[i] != 0)
+      {   
+// stretch the 'normal' font instead of using the big font
+          int tx, ty;
+          c = szMsg[i] - 32;
+          unsigned char uc1, uc2, ucMask, *pDest;
+          s = (unsigned char *)&ucFont[(int)c*8];
+          memcpy_P(ucTemp, s, 8);
+          if (bInvert)
+              InvertBytes(ucTemp, 8);
+          // Stretch the font to double width + double height
+          memset(&ucTemp[8], 0, 32); // write 32 new bytes
+          for (tx=0; tx<8; tx++)
+          {
+              ucMask = 3;
+              pDest = &ucTemp[8+tx*2];
+              uc1 = uc2 = 0;
+              c = ucTemp[tx];
+              for (ty=0; ty<4; ty++)
+              {   
+                  if (c & (1 << ty)) // a bit is set
+                      uc1 |= ucMask;
+                  if (c & (1 << (ty + 4)))
+                      uc2 |= ucMask;
+                  ucMask <<= 2;
+              }
+              pDest[0] = uc1;
+              pDest[1] = uc1; // double width
+              pDest[16] = uc2;
+              pDest[17] = uc2;
+          }
+          oledSetPosition(x, y);
+          oledWriteDataBlock(&ucTemp[8], 16);
+          oledSetPosition(x, y+1);
+          oledWriteDataBlock(&ucTemp[24], 16);
+          x += 16;
+          i++;
+      } // while
+      return 0;
+    } // 16x16
     else if (iSize == FONT_SMALL) // 6x8 font
     {
        i = 0;
@@ -1090,8 +1100,9 @@ unsigned char c, *s, ucTemp[40];
          i++;
        }
 //    oledCachedFlush(); // write any remaining data      
-    }
-  return 0;
+      return 0;
+    } // 6x8
+  return -1; // invalid size
 } /* oledWriteString() */
 
 //

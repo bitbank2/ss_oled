@@ -22,7 +22,7 @@ Features:<br>
 - Automatically detects the display address and type (I2C only)
 - Supports 72x40, 96x16, 64x32, 128x32, 128x64 and 132x64 (SH1106) display sizes<br>
 - Drive displays from I2C, SPI or any 2 GPIO pins (virtual I2C)
-- 3 sizes of fixed fonts (6x8, 8x8, 16x16/16x32)<br>
+- 4 sizes of fixed fonts (6x8, 8x8, 16x16, 16x32)<br>
 - a function to load a Windows BMP file<br>
 - Pixel drawing on SH1106 without needing backing RAM<br>
 - Optimized Bresenham line drawing<br>
