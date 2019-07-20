@@ -48,12 +48,12 @@ void oledSetContrast(unsigned char ucContrast);
 // Pass the pointer to the beginning of the BMP file
 // First pass version assumes a full screen bitmap
 //
-int oledLoadBMP(byte *pBMP, int bRender);
+int oledLoadBMP(uint8_t *pBMP, int bRender);
 //
 // Power up/down the display
 // useful for low power situations
 //
-void oledPower(byte bOn);
+void oledPower(uint8_t bOn);
 //
 // Draw a string of normal (8x8), small (6x8) or large (16x32) characters
 // At the given col+row with the given scroll offset. The scroll offset allows you to

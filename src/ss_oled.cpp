@@ -18,6 +18,22 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#ifdef _LINUX_
+#include <stdint.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <linux/i2c-dev.h>
+#include <math.h>
+#define PROGMEM
+#define memcpy_P memcpy
+static int file_i2c = 0;
+
+#else // Arduino
+
 #include <Arduino.h>
 #ifdef __AVR__
 #include <avr/pgmspace.h>
@@ -26,6 +42,8 @@
 #ifndef __AVR_ATtiny85__
 #include <SPI.h>
 #endif
+
+#endif // _LINUX_
 #include <ss_oled.h>
 
 //
@@ -36,7 +54,7 @@
 #endif // !__AVR__
 
 // small (8x8) font
-const byte ucFont[]PROGMEM = {
+const uint8_t ucFont[]PROGMEM = {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x06,0x5f,0x5f,0x06,0x00,0x00,
 0x00,0x07,0x07,0x00,0x07,0x07,0x00,0x00,0x14,0x7f,0x7f,0x14,0x7f,0x7f,0x14,0x00,
   0x24,0x2e,0x2a,0x6b,0x6b,0x3a,0x12,0x00,0x46,0x66,0x30,0x18,0x0c,0x66,0x62,0x00,
@@ -88,7 +106,7 @@ const byte ucFont[]PROGMEM = {
 // AVR MCUs have very little memory; save 6K of FLASH by stretching the 'normal'
 // font instead of using this large font
 #ifndef __AVR__
-const byte ucBigFont[]PROGMEM = {
+const uint8_t ucBigFont[]PROGMEM = {
   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
@@ -476,7 +494,7 @@ const byte ucBigFont[]PROGMEM = {
 #endif // !__AVR__
 
   // 5x7 font (in 6x8 cell)
-const byte ucSmallFont[]PROGMEM = {
+const uint8_t ucSmallFont[]PROGMEM = {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x06,0x5f,0x06,0x00,0x00,0x07,0x03,0x00,
 0x07,0x03,0x00,0x24,0x7e,0x24,0x7e,0x24,0x00,0x24,0x2b,0x6a,0x12,0x00,0x00,0x63,
 0x13,0x08,0x64,0x63,0x00,0x36,0x49,0x56,0x20,0x50,0x00,0x00,0x07,0x03,0x00,0x00,
@@ -537,7 +555,47 @@ static int iSDAPin, iSCLPin;
 //static byte bEnd = 1;
 static void oledWriteCommand(unsigned char c);
 
-// Wrapper function to write I2C data on Arduino
+// wrapper/adapter functions to make the code work on Linux
+#ifdef _LINUX_
+static uint8_t pgm_read_byte(uint8_t *ptr)
+{
+  return *ptr;
+}
+static int16_t pgm_read_word(uint8_t *ptr)
+{
+  return ptr[0] + (ptr[1]<<8);
+}
+int I2CReadRegister(uint8_t addr, uint8_t reg, uint8_t *pBuf, int iLen)
+{
+int rc;
+  rc = write(file_i2c, &reg, 1);
+  rc = read(file_i2c, pBuf, iLen);
+  return (rc > 0);
+}
+int I2CInit(int iSDAPin, int iSCLPin, int32_t iSpeed)
+{
+char filename[32];
+
+  sprintf(filename, "/dev/i2c-%d", iSDAPin); // I2C bus number passed in SDA pin
+  if ((file_i2c = open(filename, O_RDWR)) < 0)
+     return 1;
+  if (ioctl(file_i2c, I2C_SLAVE, iSCLPin) < 0) // set slave address
+  {
+     close(file_i2c);
+     file_i2c = 0;
+     return 1;
+  }
+  return 0;
+}
+#endif // _LINUX_
+
+// Wrapper function to write I2C data
+#ifdef _LINUX_
+static void _I2CWrite(unsigned char *pData, int iLen)
+{
+  write(file_i2c, pData, iLen);
+}
+#else // Arduino
 static void _I2CWrite(unsigned char *pData, int iLen)
 {
   if (iCSPin != -1) // we're writing to SPI, treat it differently
@@ -559,9 +617,9 @@ static void _I2CWrite(unsigned char *pData, int iLen)
     I2CWrite(oled_addr, pData, iLen);
   } // I2C
 } /* _I2CWrite() */
+#endif // _LINUX_
 
 #ifdef FUTURE
-
 static void oledCachedFlush(void)
 {
        _I2CWrite(bCache, bEnd); // write the old data
@@ -594,9 +652,12 @@ uint8_t uc[2];
     uc[0] = 0; // command
     uc[1] = 0xae; // display off
     _I2CWrite(uc, 2);
-
+#ifdef _LINUX_
+    close(file_i2c);
+    file_i2c = 0;
+#endif
 } /* oledShutdown() */
-#ifndef __AVR_ATtiny85__
+#if !defined( __AVR_ATtiny85__ ) && !defined( _LINUX_ )
 //
 // Initialize the OLED controller for SPI mode
 //
@@ -679,7 +740,10 @@ int rc = OLED_NOT_FOUND;
 // Disable SPI mode code
   iCSPin = iDCPin = iResetPin = -1;
 
-  I2CInit(sda, scl, iSpeed);
+  I2CInit(sda, scl, iSpeed); // on Linux, SDA = bus number, SCL = device address
+#ifdef _LINUX_
+  oled_addr = (uint8_t)scl;
+#else
   // find the device address
   oled_addr = 0;
   if (I2CTest(0x3c))
@@ -687,6 +751,7 @@ int rc = OLED_NOT_FOUND;
   else if (I2CTest(0x3d))
      oled_addr = 0x3d;
   else return rc; // no display found!
+#endif
   // Detect the display controller (SSD1306 or SH1106)
   uint8_t u = 0;
   I2CReadRegister(oled_addr, 0x00, &u, 1); // read the status register
@@ -745,7 +810,7 @@ int rc = OLED_NOT_FOUND;
 //
 // Sends a command to turn on or off the OLED display
 //
-void oledPower(byte bOn)
+void oledPower(uint8_t bOn)
 {
     if (bOn)
       oledWriteCommand(0xaf); // turn on OLED
@@ -954,9 +1019,9 @@ unsigned char uc, ucOld;
 //
 // Invert font data
 //
-void InvertBytes(byte *pData, byte bLen)
+void InvertBytes(uint8_t *pData, uint8_t bLen)
 {
-byte i;
+uint8_t i;
    for (i=0; i<bLen; i++)
    {
       *pData = ~(*pData);
@@ -969,15 +1034,15 @@ byte i;
 // Pass the pointer to the beginning of the BMP file
 // First pass version assumes a full screen bitmap
 //
-int oledLoadBMP(byte *pBMP, int bRender)
+int oledLoadBMP(uint8_t *pBMP, int bRender)
 {
 int16_t i16;
 int iOffBits, q, y, j; // offset to bitmap data
 int iPitch;
-byte x, z, b, *s;
-byte dst_mask;
-byte ucTemp[16]; // process 16 bytes at a time
-byte bFlipped = false;
+uint8_t x, z, b, *s;
+uint8_t dst_mask;
+uint8_t ucTemp[16]; // process 16 bytes at a time
+uint8_t bFlipped = false;
 
   i16 = pgm_read_word(pBMP);
   if (i16 != 0x4d42) // must start with 'BM'
@@ -1313,7 +1378,7 @@ void oledDrawLine(int x1, int y1, int x2, int y2, int bRender)
   int dx = x2 - x1;
   int dy = y2 - y1;
   int error;
-  byte *p, *pStart, mask, bOld, bNew;
+  uint8_t *p, *pStart, mask, bOld, bNew;
   int xinc, yinc;
   int y, x;
   
