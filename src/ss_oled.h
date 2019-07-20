@@ -48,7 +48,7 @@ void oledSetContrast(unsigned char ucContrast);
 // Pass the pointer to the beginning of the BMP file
 // First pass version assumes a full screen bitmap
 //
-int oledLoadBMP(byte *pBMP);
+int oledLoadBMP(byte *pBMP, int bRender);
 //
 // Power up/down the display
 // useful for low power situations
@@ -56,14 +56,17 @@ int oledLoadBMP(byte *pBMP);
 void oledPower(byte bOn);
 //
 // Draw a string of normal (8x8), small (6x8) or large (16x32) characters
-// At the given col+row
+// At the given col+row with the given scroll offset. The scroll offset allows you to
+// horizontally scroll text which does not fit on the width of the display. The offset
+// represents the pixels to skip when drawing the text. An offset of 0 starts at the beginning
+// of the text. Returns 0 for success, -1 for invalid parameter
 //
-int oledWriteString(int x, int y, char *szMsg, int iSize, int bInvert);
+int oledWriteString(int iScrollX, int x, int y, char *szMsg, int iSize, int bInvert, int bRender);
 //
 // Fill the frame buffer with a byte pattern
 // e.g. all off (0x00) or all on (0xff)
 //
-void oledFill(unsigned char ucData);
+void oledFill(unsigned char ucData, int bRender);
 //
 // Set (or clear) an individual pixel
 // The local copy of the frame buffer is used to avoid
@@ -72,18 +75,33 @@ void oledFill(unsigned char ucData);
 // This function needs the USE_BACKBUFFER macro to be defined
 // otherwise, new pixels will erase old pixels within the same byte
 //
-int oledSetPixel(int x, int y, unsigned char ucColor);
+int oledSetPixel(int x, int y, unsigned char ucColor, int bRender);
 //
 // Dump an entire custom buffer to the display
 // useful for custom animation effects
 //
 void oledDumpBuffer(uint8_t *pBuffer);
 //
+// Render a window of pixels from a provided buffer or the library's internal buffer
+// to the display. The row values refer to byte rows, not pixel rows due to the memory
+// layout of OLEDs. Pass a src pointer of NULL to use the internal backing buffer
+// returns 0 for success, -1 for invalid parameter
+//
+int oledDrawGFX(uint8_t *pSrc, int iSrcCol, int iSrcRow, int iDestCol, int iDestRow, int iWidth, int iHeight, int iSrcPitch);
+
+void oledDumpBuffer(uint8_t *pBuffer);
+//
 // Draw a line between 2 points
 //
-void oledDrawLine(int x1, int y1, int x2, int y2);
+void oledDrawLine(int x1, int y1, int x2, int y2, int bRender);
 //
 // Get the buffer pointer for direct manipulation of the pixels
 //
 uint8_t * oledGetBuffer(void);
 
+//
+// Scroll the internal buffer by 1 scanline (up/down)
+// width is in pixels, lines is group of 8 rows
+// Returns 0 for success, -1 for invalid parameter
+//
+int oledScrollBuffer(int iStartCol, int iEndCol, int iStartRow, int iEndRow, int bUp);
