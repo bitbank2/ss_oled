@@ -845,6 +845,7 @@ void oledSetContrast(unsigned char ucContrast)
 {
   oledWriteCommand2(0x81, ucContrast);
 } /* oledSetContrast() */
+#ifdef USE_BACKBUFFER
 //
 // Scroll the internal buffer by 1 scanline (up/down)
 // width is in pixels, lines is group of 8 rows
@@ -891,6 +892,7 @@ int oledScrollBuffer(int iStartCol, int iEndCol, int iStartRow, int iEndRow, int
     }
     return 0;
 } /* oledScrollBuffer() */
+#endif // USE_BACKBUFFER
 //
 // Send commands to position the "cursor" (aka memory write address)
 // to the given row and column
