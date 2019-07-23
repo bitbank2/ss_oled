@@ -22,7 +22,7 @@ void loop() {
 int i, x, y;
 char szTemp[32];
 
-  oledFill(0x0);
+  oledFill(0x0, 1);
   oledWriteString(0,16,0,(char *)"ss_oled Demo", FONT_NORMAL, 0, 1);
   oledWriteString(0,0,1,(char *)"Written by Larry Bank", FONT_SMALL, 1, 1);
   oledWriteString(0,0,3,(char *)"**Demo**", FONT_LARGE, 0, 1);
