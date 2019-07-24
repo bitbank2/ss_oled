@@ -12,7 +12,7 @@ rc = oledInit(OLED_128x64, 0, 0, -1, -1,400000L); // use standard I2C bus at 400
   {
     char *msgs[] = {"SSD1306 @ 0x3C", "SSD1306 @ 0x3D","SH1106 @ 0x3C","SH1106 @ 0x3D"};
     oledFill(0, 1);
-    oledWriteString(0,0,0,msgs[rc], FONT_NORMAL, 0, 0);
+    oledWriteString(0,0,0,msgs[rc], FONT_NORMAL, 0, 1);
     delay(2000);
   }
 }
