@@ -16,6 +16,16 @@ enum {
   OLED_72x40
 };
 
+// Rotation and flip angles to draw tiles
+enum {
+  ANGLE_0=0,
+  ANGLE_90,
+  ANGLE_180,
+  ANGLE_270,
+  ANGLE_FLIPX,
+  ANGLE_FLIPY
+};
+
 // Return value from oledInit()
 enum {
   OLED_NOT_FOUND = -1, // no display found
@@ -105,3 +115,12 @@ uint8_t * oledGetBuffer(void);
 // Returns 0 for success, -1 for invalid parameter
 //
 int oledScrollBuffer(int iStartCol, int iEndCol, int iStartRow, int iEndRow, int bUp);
+//
+// Draw a 16x16 tile in any of 4 rotated positions
+// Assumes input image is laid out like "normal" graphics with
+// the MSB on the left and 2 bytes per line
+// On AVR, the source image is assumed to be in FLASH memory
+// The function can draw the tile on byte boundaries, so the x value
+// can be from 0 to 112 and y can be from 0 to 6
+//
+void oledDrawTile(const uint8_t *pTile, int x, int y, int iRotation, int bRender);

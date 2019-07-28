@@ -961,6 +961,92 @@ unsigned char ucTemp[129];
 #endif
 }
 
+//
+// Draw a 16x16 tile in any of 4 rotated positions
+// Assumes input image is laid out like "normal" graphics with
+// the MSB on the left and 2 bytes per line
+// On AVR, the source image is assumed to be in FLASH memory
+// The function can draw the tile on byte boundaries, so the x value
+// can be from 0 to 112 and y can be from 0 to 6
+//
+void oledDrawTile(const uint8_t *pTile, int x, int y, int iRotation, int bRender)
+{
+    uint8_t ucTemp[32]; // prepare LCD data here
+    uint8_t i, j, k, iOffset, ucMask, uc, ucPixels;
+    uint8_t bFlipX=0, bFlipY=0;
+    
+    if (x < 0 || y < 0 || y > 6 || x > 112)
+        return; // out of bounds
+    if (pTile == NULL) return; // bad pointer; really? :(
+    if (iRotation == ANGLE_180 || iRotation == ANGLE_270 || iRotation == ANGLE_FLIPX)
+        bFlipX = 1;
+    if (iRotation == ANGLE_180 || iRotation == ANGLE_270 || iRotation == ANGLE_FLIPY)
+        bFlipY = 1;
+    
+    memset(ucTemp, 0, sizeof(ucTemp)); // we only set white pixels, so start from black
+    if (iRotation == ANGLE_0 || iRotation == ANGLE_180 || iRotation == ANGLE_FLIPX || iRotation == ANGLE_FLIPY)
+    {
+        for (j=0; j<16; j++) // y
+        {
+            for (i=0; i<16; i+=8) // x
+            {
+                ucPixels = pgm_read_byte(pTile++);
+                ucMask = 0x80; // MSB is the first source pixel
+                for (k=0; k<8; k++)
+                {
+                    if (ucPixels & ucMask) // translate the pixel
+                    {
+                        if (bFlipY)
+                            uc = 0x80 >> (j & 7);
+                        else
+                            uc = 1 << (j & 7);
+                        iOffset = i+k;
+                        if (bFlipX) iOffset = 15-iOffset;
+                        iOffset += (j & 8)<<1; // top/bottom half of output
+                        if (bFlipY)
+                            iOffset ^= 16;
+                        ucTemp[iOffset] |= uc;
+                    }
+                    ucMask >>= 1;
+                } // for k
+            } // for i
+        } // for j
+    }
+    else // rotated 90/270
+    {
+        for (j=0; j<16; j++) // y
+        {
+            for (i=0; i<16; i+=8) // x
+            {
+                ucPixels = pgm_read_byte(pTile++);
+                ucMask = 0x80; // MSB is the first source pixel
+                for (k=0; k<8; k++)
+                {
+                    if (ucPixels & ucMask) // translate the pixel
+                    {
+                        if (bFlipY)
+                            uc = 0x80 >> k;
+                        else
+                            uc = 1 << k;
+                        iOffset = 15-j;
+                        if (bFlipX) iOffset = 15-iOffset;
+                        iOffset += i<<1; // top/bottom half of output
+                        if (bFlipY)
+                            iOffset ^= 16;
+                        ucTemp[iOffset] |= uc;
+                    }
+                    ucMask >>= 1;
+                } // for k
+            } // for i
+        } // for j
+    }
+    // Send the data to the display
+    oledSetPosition(x, y, bRender);
+    oledWriteDataBlock(ucTemp, 16, bRender); // top half
+    oledSetPosition(x,y+1, bRender);
+    oledWriteDataBlock(&ucTemp[16], 16, bRender); // bottom half
+} /* oledDrawTile() */
+
 // Set (or clear) an individual pixel
 // The local copy of the frame buffer is used to avoid
 // reading data from the display controller
