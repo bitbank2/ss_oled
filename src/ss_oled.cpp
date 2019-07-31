@@ -1098,6 +1098,7 @@ unsigned char uc, ucOld;
       ucTemp[1] = uc;   // actual data
       ucTemp[2] = 0x80; // one command
       ucTemp[3] = 0xEE; // end read_modify_write operation
+      _I2CWrite(ucTemp, 4);
     }
 #endif
   }
