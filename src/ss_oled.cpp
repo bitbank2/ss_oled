@@ -29,6 +29,8 @@
 #include <linux/i2c-dev.h>
 #include <math.h>
 #define PROGMEM
+#define false 0
+#define true 1
 #define memcpy_P memcpy
 static int file_i2c = 0;
 

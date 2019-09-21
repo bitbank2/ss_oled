@@ -1,8 +1,14 @@
 #ifndef __SS_OLED_H__
 #define __SS_OLED_H__
 
+// Make the Linux library interface C instead of C++
+#if defined(_LINUX_) && defined(__cplusplus)
+extern "C" {
+#endif
+
 // These are defined the same in my SPI_LCD library
 #ifndef SPI_LCD_H
+
 // 4 possible font sizes: 8x8, 16x32, 6x8, 16x16 (stretched from 8x8)
 enum {
    FONT_NORMAL = 0,
@@ -130,4 +136,9 @@ int oledScrollBuffer(int iStartCol, int iEndCol, int iStartRow, int iEndRow, int
 //
 void oledDrawTile(const uint8_t *pTile, int x, int y, int iRotation, int bRender);
 
+#if defined(_LINUX_) && defined(__cplusplus)
+}
+#endif // _LINUX_
+
 #endif // __SS_OLED_H__
+
