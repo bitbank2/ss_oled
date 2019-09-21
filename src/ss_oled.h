@@ -1,3 +1,8 @@
+#ifndef __SS_OLED_H__
+#define __SS_OLED_H__
+
+// These are defined the same in my SPI_LCD library
+#ifndef SPI_LCD_H
 // 4 possible font sizes: 8x8, 16x32, 6x8, 16x16 (stretched from 8x8)
 enum {
    FONT_NORMAL = 0,
@@ -5,6 +10,7 @@ enum {
    FONT_SMALL,
    FONT_STRETCHED
 };
+#endif
 
 // OLED type for init function
 enum {
@@ -99,7 +105,6 @@ void oledDumpBuffer(uint8_t *pBuffer);
 //
 int oledDrawGFX(uint8_t *pSrc, int iSrcCol, int iSrcRow, int iDestCol, int iDestRow, int iWidth, int iHeight, int iSrcPitch);
 
-void oledDumpBuffer(uint8_t *pBuffer);
 //
 // Draw a line between 2 points
 //
@@ -124,3 +129,5 @@ int oledScrollBuffer(int iStartCol, int iEndCol, int iStartRow, int iEndRow, int
 // can be from 0 to 112 and y can be from 0 to 6
 //
 void oledDrawTile(const uint8_t *pTile, int x, int y, int iRotation, int bRender);
+
+#endif // __SS_OLED_H__

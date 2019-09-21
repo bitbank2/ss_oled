@@ -49,9 +49,9 @@ static int file_i2c = 0;
 //
 // For non-AVR micros, 1K of RAM isn't fatal
 //
-#ifndef __AVR__
+//#ifndef __AVR__
 #define USE_BACKBUFFER
-#endif // !__AVR__
+//#endif // !__AVR__
 
 // small (8x8) font
 const uint8_t ucFont[]PROGMEM = {
@@ -541,6 +541,10 @@ const unsigned char oled32_initbuf[] = {
 0x00,0xae,0xd5,0x80,0xa8,0x1f,0xd3,0x00,0x40,0x8d,0x14,0xa1,0xc8,0xda,0x02,
 0x81,0x7f,0xd9,0xf1,0xdb,0x40,0xa4,0xa6,0xaf};
 
+const unsigned char oled72_initbuf[]={0x00,0xae,0xa8,0x3f,0xd3,0x00,0x40,0xa1,0xc8,
+      0xda,0x12,0x81,0xff,0xd9,0xf1,0xa4,0xa6,0xd5,0x80,0x8d,0x14,
+      0xaf,0x20,0x02};
+
 // some globals
 static int iCSPin, iDCPin, iResetPin;
 static int iScreenOffset; // current write offset of screen data
@@ -770,7 +774,9 @@ int rc = OLED_NOT_FOUND;
 
   if (iType == OLED_128x32 || iType == OLED_96x16)
      _I2CWrite((unsigned char *)oled32_initbuf, sizeof(oled32_initbuf));
-  else // 132x64, 128x64 and 64x32, 72x40
+  else if (iType == OLED_72x40)
+     _I2CWrite((unsigned char *)oled72_initbuf, sizeof(oled72_initbuf));
+  else // 132x64, 128x64 and 64x32
      _I2CWrite((unsigned char *)oled64_initbuf, sizeof(oled64_initbuf));
   if (bInvert)
   {
@@ -1444,6 +1450,9 @@ unsigned char temp[16];
     {
       oledWriteDataBlock(temp, 16, bRender);
     } // for x
+    // 72 isn't evenly divisible by 16, so fix it
+    if (oled_type == OLED_72x40)
+       oledWriteDataBlock(temp, 8, bRender);
   } // for y
 #ifdef USE_BACKBUFFER
    memset(ucScreen, ucData, 1024);
