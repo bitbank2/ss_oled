@@ -25,6 +25,7 @@ Features:<br>
 - 4 sizes of fixed fonts (6x8, 8x8, 16x16, 16x32)<br>
 - Deferred rendering allows preparing a back buffer, then displaying it
 - Text scrolling features (vertical and horizontal)
+- Text cursor position with optional line wrap
 - a function to load a Windows BMP file<br>
 - Pixel drawing on SH1106 without needing backing RAM<br>
 - Optimized Bresenham line drawing<br>
