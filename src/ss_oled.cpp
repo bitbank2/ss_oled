@@ -553,7 +553,8 @@ static int iScreenOffset; // current write offset of screen data
 #ifdef USE_BACKBUFFER
 static unsigned char ucScreen[1024]; // local copy of the image buffer
 #endif
-static int oled_flip, oled_addr, oled_type;
+static int oled_wrap, oled_flip, oled_addr, oled_type;
+static int iCursorX, iCursorY;
 static uint8_t oled_x, oled_y; // width and height of the display
 static int iSDAPin, iSCLPin;
 #define MAX_CACHE 32
@@ -677,6 +678,7 @@ int iLen;
   iResetPin = iReset;
   oled_type = iType;
   oled_flip = bFlip;
+  oled_wrap = 0; // default - disable text wrap
 
   pinMode(iDCPin, OUTPUT);
   pinMode(iCSPin, OUTPUT);
@@ -741,6 +743,7 @@ int rc = OLED_NOT_FOUND;
 
   oled_type = iType;
   oled_flip = bFlip;
+  oled_wrap = 0; // default - disable text wrap
   iSDAPin = sda;
   iSCLPin = scl;
 // Disable SPI mode code
@@ -1192,7 +1195,22 @@ uint8_t bFlipped = false;
   } // for y
   return 0;
 } /* oledLoadBMP() */
-
+//
+// Set the current cursor position
+// The column represents the pixel column (0-127)
+// The row represents the text row (0-7)
+//
+void oledSetCursor(int x, int y)
+{
+  iCursorX = x; iCursorY = y;
+} /* oledSetCursor() */
+//
+// Turn text wrap on or off for the oldWriteString() function
+//
+void oledSetTextWrap(int bWrap)
+{
+  oled_wrap = bWrap;
+} /* oledSetTextWrap() */
 //
 // Draw a string of normal (8x8), small (6x8) or large (16x32) characters
 // At the given col+row
@@ -1202,12 +1220,23 @@ int oledWriteString(int iScroll, int x, int y, char *szMsg, int iSize, int bInve
 int i, iFontOff, iLen, iFontSkip;
 unsigned char c, *s, ucTemp[40];
 
-    oledSetPosition(x, y, bRender);
+    if (x == -1 || y == -1) // use the cursor position
+    {
+      x = iCursorX; y = iCursorY;
+    }
+    else
+    {
+      iCursorX = x; iCursorY = y; // set the new cursor position
+    }
+    if (iCursorX >= oled_x || iCursorY >= oled_y / 8)
+       return; // can't draw off the display
+
+    oledSetPosition(iCursorX, iCursorY, bRender);
     if (iSize == FONT_NORMAL) // 8x8 font
     {
        i = 0;
        iFontSkip = iScroll & 7; // number of columns to initially skip
-       while (x < oled_x && szMsg[i] != 0)
+       while (iCursorX < oled_x && szMsg[i] != 0 && iCursorY < oled_y / 8)
        {
          if (iScroll < 8) // only display visible characters
          {
@@ -1218,10 +1247,16 @@ unsigned char c, *s, ucTemp[40];
              if (bInvert) InvertBytes(ucTemp, 8);
     //         oledCachedWrite(ucTemp, 8);
              iLen = 8 - iFontSkip;
-             if (x + iLen > oled_x) // clip right edge
-                 iLen = oled_x - x;
+             if (iCursorX + iLen > oled_x) // clip right edge
+                 iLen = oled_x - iCursorX;
              oledWriteDataBlock(&ucTemp[iFontSkip], iLen, bRender); // write character pattern
-             x += iLen;
+             iCursorX += iLen;
+             if (iCursorX >= oled_x && oled_wrap) // word wrap enabled?
+             {
+               iCursorX = 0; // start at the beginning of the next line
+               iCursorY++;
+               oledSetPosition(iCursorX, iCursorY, bRender);
+             }
              iFontSkip = 0;
          }
          iScroll -= 8;
@@ -1235,38 +1270,43 @@ unsigned char c, *s, ucTemp[40];
     {
       i = 0;
       iFontSkip = iScroll & 15; // number of columns to initially skip
-      while (x < oled_x && szMsg[i] != 0)
+      while (iCursorX < oled_x && iCursorY < (oled_y / 8)-3 && szMsg[i] != 0)
       {
           if (iScroll < 16) // if characters are visible
           {
               s = (unsigned char *)&ucBigFont[(unsigned char)(szMsg[i]-32)*64];
               iLen = 16 - iFontSkip;
-              if (x + iLen > oled_x) // clip right edge
-                  iLen = oled_x - x;
+              if (iCursorX + iLen > oled_x) // clip right edge
+                  iLen = oled_x - iCursorX;
               // we can't directly use the pointer to FLASH memory, so copy to a local buffer
-              oledSetPosition(x, y, bRender);
+              oledSetPosition(iCursorX, iCursorY, bRender);
               memcpy_P(ucTemp, s, 16);
               if (bInvert) InvertBytes(ucTemp, 16);
               oledWriteDataBlock(&ucTemp[iFontSkip], iLen, bRender); // write character pattern
-              oledSetPosition(x, y+1, bRender);
+              oledSetPosition(iCursorX, iCursorY+1, bRender);
               memcpy_P(ucTemp, s+16, 16);
               if (bInvert) InvertBytes(ucTemp, 16);
               oledWriteDataBlock(&ucTemp[iFontSkip], iLen, bRender); // write character pattern
-              if (y <= 5)
+              if (iCursorY <= 5)
               {
-                 oledSetPosition(x, y+2, bRender);
+                 oledSetPosition(iCursorX, iCursorY+2, bRender);
                  memcpy_P(ucTemp, s+32, 16);
                  if (bInvert) InvertBytes(ucTemp, 16);
                  oledWriteDataBlock(&ucTemp[iFontSkip], iLen, bRender); // write character pattern
               }
-              if (y <= 4)
+              if (iCursorY <= 4)
               {
-                 oledSetPosition(x, y+3, bRender);
+                 oledSetPosition(iCursorX, iCursorY+3, bRender);
                  memcpy_P(ucTemp, s+48, 16);
                  if (bInvert) InvertBytes(ucTemp, 16);
                  oledWriteDataBlock(&ucTemp[iFontSkip], iLen, bRender); // write character pattern
               }
-              x += iLen;
+              iCursorX += iLen;
+              if (iCursorX >= oled_x && oled_wrap) // word wrap enabled?
+              {
+                iCursorX = 0; // start at the beginning of the next line
+                iCursorY+=4;
+              }
               iFontSkip = 0;
           } // if character visible from scrolling
           iScroll -= 16;
@@ -1279,7 +1319,7 @@ unsigned char c, *s, ucTemp[40];
     {
       i = 0;
       iFontSkip = iScroll & 15; // number of columns to initially skip
-      while (x < oled_x && szMsg[i] != 0)
+      while (iCursorX < oled_x && iCursorY < (oled_y/8)-1 && szMsg[i] != 0)
       {   
 // stretch the 'normal' font instead of using the big font
           if (iScroll < 16) // if characters are visible
@@ -1313,13 +1353,19 @@ unsigned char c, *s, ucTemp[40];
                   pDest[17] = uc2;
               }
               iLen = 16 - iFontSkip;
-              if (x + iLen > oled_x) // clip right edge
-                  iLen = oled_x - x;
-              oledSetPosition(x, y, bRender);
+              if (iCursorX + iLen > oled_x) // clip right edge
+                  iLen = oled_x - iCursorX;
+              oledSetPosition(iCursorX, iCursorY, bRender);
               oledWriteDataBlock(&ucTemp[8+iFontSkip], iLen, bRender);
-              oledSetPosition(x, y+1, bRender);
+              oledSetPosition(iCursorX, iCursorY+1, bRender);
               oledWriteDataBlock(&ucTemp[24+iFontSkip], iLen, bRender);
-              x += iLen;
+              iCursorX += iLen;
+              if (iCursorX >= oled_x && oled_wrap) // word wrap enabled?
+              {
+                iCursorX = 0; // start at the beginning of the next line
+                iCursorY += 2;
+                oledSetPosition(iCursorX, iCursorY, bRender);
+              }
               iFontSkip = 0;
           } // if characters are visible
           iScroll -= 16;
@@ -1331,7 +1377,7 @@ unsigned char c, *s, ucTemp[40];
     {
        i = 0;
        iFontSkip = iScroll % 6;
-       while (x < oled_x && szMsg[i] != 0)
+       while (iCursorX < oled_x && iCursorY < (oled_y/8) && szMsg[i] != 0)
        {
            if (iScroll < 6) // if characters are visible
            {
@@ -1340,12 +1386,18 @@ unsigned char c, *s, ucTemp[40];
                memcpy_P(ucTemp, &ucSmallFont[(int)c*6], 6);
                if (bInvert) InvertBytes(ucTemp, 6);
                iLen = 6 - iFontSkip;
-               if (x + iLen > oled_x) // clip right edge
-                   iLen = oled_x - x;
+               if (iCursorX + iLen > oled_x) // clip right edge
+                   iLen = oled_x - iCursorX;
                oledWriteDataBlock(&ucTemp[iFontSkip], iLen, bRender); // write character pattern
     //         oledCachedWrite(ucTemp, 6);
-               x += iLen;
+               iCursorX += iLen;
                iFontSkip = 0;
+               if (iCursorX >= oled_x && oled_wrap) // word wrap enabled?
+               {
+                 iCursorX = 0; // start at the beginning of the next line
+                 iCursorY++;
+                 oledSetPosition(iCursorX, iCursorY, bRender);
+               }
            } // if characters are visible
          iScroll -= 6;
          i++;
@@ -1444,6 +1496,7 @@ unsigned char temp[16];
   iLines = oled_y >> 3;
   iCols = oled_x >> 4;
   memset(temp, ucData, 16);
+  iCursorX = iCursorY = 0;
  
   for (y=0; y<iLines; y++)
   {

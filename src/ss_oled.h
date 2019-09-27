@@ -77,11 +77,29 @@ int oledLoadBMP(uint8_t *pBMP, int bRender);
 //
 void oledPower(uint8_t bOn);
 //
+// Set the current cursor position
+// The column represents the pixel column (0-127)
+// The row represents the text row (0-7)
+//
+void oledSetCursor(int x, int y);
+
+//
+// Turn text wrap on or off for the oldWriteString() function
+//
+void oledSetTextWrap(int bWrap);
+//
 // Draw a string of normal (8x8), small (6x8) or large (16x32) characters
 // At the given col+row with the given scroll offset. The scroll offset allows you to
 // horizontally scroll text which does not fit on the width of the display. The offset
 // represents the pixels to skip when drawing the text. An offset of 0 starts at the beginning
-// of the text. Returns 0 for success, -1 for invalid parameter
+// of the text.
+// The system remembers where the last text was written (the cursor position)
+// To continue writing from the last position, set the x,y values to -1
+// The text can optionally wrap around to the next line by calling oledSetTextWrap(true);
+// otherwise text which would go off the right edge will not be drawn and the cursor will
+// be left "off screen" until set to a new position explicitly
+//
+//  Returns 0 for success, -1 for invalid parameter
 //
 int oledWriteString(int iScrollX, int x, int y, char *szMsg, int iSize, int bInvert, int bRender);
 //
