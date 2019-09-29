@@ -14,8 +14,17 @@ access to the GPIO pins to allow speeds which match or exceed normal I2C
 speeds. The pins are numbered with the Port letter as the first digit followed
 by the bit number. For example, To use bit 0 of Port B, you would reference
 pin number 0xb0. Includes the unique feature that the init function automatically
-detects the display address (0x3C or 0x3D) and the controller type (SSD1306 or
-SH1106).<br>
+detects the display address (0x3C or 0x3D) and the controller type (SSD1306, SH1106 or
+SH1107).<br>
+I try to support as many OLEDs as I can. I was able to justify buying a bunch
+of different sized SSD1306 displays because they're around $2 each. A generous patron
+donated money so that I could purchase Pimoroni's 128x128 OLED and add support for it.
+It uses the SH1107 controller and behaves very similarly to the SH1106. The only issue
+which may cause some problems for people is that the backing buffer now is set to 2K
+instead of 1K. It's disabled by default on AVR, but if you manually enable it on an AVR
+and are not using a 128x128 display, make sure to change the buffer size or you won't
+have enough RAM.
+<br>
 
 Features:<br>
 ---------<br>
