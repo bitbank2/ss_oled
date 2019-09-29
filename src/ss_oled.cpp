@@ -51,9 +51,9 @@ static int file_i2c = 0;
 //
 // For non-AVR micros, 1K of RAM isn't fatal
 //
-//#ifndef __AVR__
+#ifndef __AVR__
 #define USE_BACKBUFFER
-//#endif // !__AVR__
+#endif // !__AVR__
 
 // small (8x8) font
 const uint8_t ucFont[]PROGMEM = {
@@ -535,6 +535,10 @@ const uint8_t ucSmallFont[]PROGMEM = {
   0x41,0x41,0x3e,0x08,0x00,0x02,0x01,0x02,0x01,0x00,0x00,0x3c,0x26,0x23,0x26,0x3c};
 
 // Initialization sequences
+const unsigned char oled128_initbuf[] = {0x00, 0xae,0xdc,0x00,0x81,0x40,
+      0xa1,0xc8,0xa8,0x7f,0xd5,0x50,0xd9,0x22,0xdb,0x35,0xb0,0xda,0x12,
+      0xa4,0xa6,0xaf};
+
 const unsigned char oled64_initbuf[]={0x00,0xae,0xa8,0x3f,0xd3,0x00,0x40,0xa1,0xc8,
       0xda,0x12,0x81,0xff,0xa4,0xa6,0xd5,0x80,0x8d,0x14,
       0xaf,0x20,0x02};
@@ -551,7 +555,7 @@ const unsigned char oled72_initbuf[]={0x00,0xae,0xa8,0x3f,0xd3,0x00,0x40,0xa1,0x
 static int iCSPin, iDCPin, iResetPin;
 static int iScreenOffset; // current write offset of screen data
 #ifdef USE_BACKBUFFER
-static unsigned char ucScreen[1024]; // local copy of the image buffer
+static unsigned char ucScreen[2048]; // local copy of the image buffer
 #endif
 static int oled_wrap, oled_flip, oled_addr, oled_type;
 static int iCursorX, iCursorY;
@@ -707,6 +711,11 @@ int iLen;
      s = (uint8_t *)oled32_initbuf;
      iLen = sizeof(oled32_initbuf);
   }
+  else if (iType == OLED_128x128)
+  {
+     s = (uint8_t *)oled128_initbuf;
+     iLen = sizeof(oled128_initbuf);
+  }
   else
   {
      s = (uint8_t *)oled64_initbuf;
@@ -761,11 +770,17 @@ int rc = OLED_NOT_FOUND;
      oled_addr = 0x3d;
   else return rc; // no display found!
 #endif
-  // Detect the display controller (SSD1306 or SH1106)
+  // Detect the display controller (SSD1306, SH1107 or SH1106)
   uint8_t u = 0;
   I2CReadRegister(oled_addr, 0x00, &u, 1); // read the status register
   u &= 0x0f; // mask off power on/off bit
-  if (u == 0x8) // SH1106
+  if (u == 0x7 || u == 0xf) // SH1107
+  {
+    oled_type = OLED_128x128;
+    rc = OLED_SH1107_3C;
+    bFlip = !bFlip; // SH1107 seems to have this reversed from the usual direction
+  }
+  else if (u == 0x8) // SH1106
   {
     rc = OLED_SH1106_3C;
     oled_type = OLED_132x64; // needs to be treated a little differently
@@ -779,6 +794,8 @@ int rc = OLED_NOT_FOUND;
 
   if (iType == OLED_128x32 || iType == OLED_96x16)
      _I2CWrite((unsigned char *)oled32_initbuf, sizeof(oled32_initbuf));
+  else if (iType == OLED_128x128)
+     _I2CWrite((unsigned char *)oled128_initbuf, sizeof(oled128_initbuf));
   else if (iType == OLED_72x40)
      _I2CWrite((unsigned char *)oled72_initbuf, sizeof(oled72_initbuf));
   else // 132x64, 128x64 and 64x32
@@ -806,6 +823,8 @@ int rc = OLED_NOT_FOUND;
   }
   else if (iType == OLED_128x32)
     oled_y = 32;
+  else if (iType == OLED_128x128)
+    oled_y = 128;
   else if (iType == OLED_64x32)
   {
     oled_x = 64;

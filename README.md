@@ -20,14 +20,14 @@ SH1106).<br>
 Features:<br>
 ---------<br>
 - Automatically detects the display address and type (I2C only)
-- Supports 72x40, 96x16, 64x32, 128x32, 128x64 and 132x64 (SH1106) display sizes<br>
+- Supports 72x40, 96x16, 64x32, 128x32, 128x64, 128x128 (SH1107) and 132x64 (SH1106) display sizes<br>
 - Drive displays from I2C, SPI or any 2 GPIO pins (virtual I2C)
 - 4 sizes of fixed fonts (6x8, 8x8, 16x16, 16x32)<br>
 - Deferred rendering allows preparing a back buffer, then displaying it
 - Text scrolling features (vertical and horizontal)
 - Text cursor position with optional line wrap
 - a function to load a Windows BMP file<br>
-- Pixel drawing on SH1106 without needing backing RAM<br>
+- Pixel drawing on SH1106/7 without needing backing RAM<br>
 - Optimized Bresenham line drawing<br>
 - Optional backing RAM for drawing pixels for systems with enough RAM<br>
 - 16x16 Tile/Sprite drawing at any angle.

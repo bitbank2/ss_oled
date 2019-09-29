@@ -20,7 +20,8 @@ enum {
 
 // OLED type for init function
 enum {
-  OLED_128x32 = 1,
+  OLED_128x128 = 1,
+  OLED_128x32,
   OLED_128x64,
   OLED_132x64,
   OLED_64x32,
@@ -45,6 +46,8 @@ enum {
   OLED_SSD1306_3D,  // SSD1306 found at 0x3D
   OLED_SH1106_3C,   // SH1106 found at 0x3C
   OLED_SH1106_3D,   // SH1106 found at 0x3D
+  OLED_SH1107_3C,  // SH1107
+  OLED_SH1107_3D
 };
 //
 // Initializes the OLED controller into "page mode" on I2C
