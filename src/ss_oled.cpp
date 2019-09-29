@@ -1093,7 +1093,7 @@ unsigned char uc, ucOld;
 #ifdef USE_BACKBUFFER
   uc = ucOld = ucScreen[i];
 #else
-  if (oled_type == OLED_132x64) // SH1106 can read data
+  if (oled_type == OLED_132x64 || oled_type == OLED_128x128) // SH1106/SH1107 can read data
   {
   uint8_t ucTemp[3];
      ucTemp[0] = 0x80; // one command
@@ -1121,7 +1121,7 @@ unsigned char uc, ucOld;
     oledWriteDataBlock(&uc, 1, bRender);
     ucScreen[i] = uc;
 #else
-    if (oled_type == OLED_132x64) // end the read_modify_write operation
+    if (oled_type == OLED_132x64 || oled_type == OLED_128x128) // end the read_modify_write operation
     {
     uint8_t ucTemp[4];
       ucTemp[0] = 0xc0; // one data
