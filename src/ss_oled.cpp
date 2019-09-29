@@ -1248,7 +1248,7 @@ unsigned char c, *s, ucTemp[40];
       iCursorX = x; iCursorY = y; // set the new cursor position
     }
     if (iCursorX >= oled_x || iCursorY >= oled_y / 8)
-       return; // can't draw off the display
+       return -1; // can't draw off the display
 
     oledSetPosition(iCursorX, iCursorY, bRender);
     if (iSize == FONT_NORMAL) // 8x8 font
