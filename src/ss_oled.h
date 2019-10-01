@@ -140,6 +140,15 @@ void oledDrawLine(int x1, int y1, int x2, int y2, int bRender);
 // Get the buffer pointer for direct manipulation of the pixels
 //
 uint8_t * oledGetBuffer(void);
+//
+// Play a frame of animation data
+// The animation data is assumed to be encoded for a full frame of the display
+// Given the pointer to the start of the compressed data,
+// it returns the pointer to the start of the next frame
+// Frame rate control is up to the calling program to manage
+// When it finishes the last frame, it will start again from the beginning
+//
+uint8_t * oledPlayAnimFrame(uint8_t *pAnimation, uint8_t *pCurrent, int iLen);
 
 //
 // Scroll the internal buffer by 1 scanline (up/down)

@@ -931,9 +931,7 @@ static void oledSetPosition(int x, int y, int bRender)
 {
 unsigned char buf[4];
 
-#ifdef USE_BACKBUFFER 
   iScreenOffset = (y*128)+x;
-#endif
   if (!bRender)
       return; // don't send the commands to the OLED if we're not rendering the graphics now
   if (oled_type == OLED_64x32) // visible display starts at column 32, row 4
@@ -966,7 +964,7 @@ unsigned char buf[4];
   buf[2] = x & 0xf; // lower column address
   buf[3] = 0x10 | (x >> 4); // upper column addr
   _I2CWrite(buf, 4);
-}
+} /* oledSetPosition() */
 
 //
 // Write a block of pixel data to the OLED
@@ -988,8 +986,167 @@ unsigned char ucTemp[129];
 #ifdef USE_BACKBUFFER
   memcpy(&ucScreen[iScreenOffset], ucBuf, iLen);
   iScreenOffset += iLen;
+  iScreenOffset &= ((oled_x * oled_y / 8) - 1);
 #endif
 }
+//
+// Byte operands for compressing the data
+// The first 2 bits are the type, followed by the counts
+#define OP_MASK 0xc0
+#define OP_SKIPCOPY 0x00
+#define OP_COPYSKIP 0x40
+#define OP_REPEATSKIP 0x80
+#define OP_REPEAT 0xc0
+//
+// Write a block of flash memory to the display
+//
+void oledWriteFlashBlock(byte *s, int iLen)
+{
+int j;
+int iWidthMask = oled_x -1;
+int iSizeMask = ((oled_x * oled_y)/8) - 1;
+int iWidthShift = (oled_x == 128) ? 7:6; // assume 128 or 64 wide
+uint8_t ucTemp[128];
+
+     while (((iScreenOffset & iWidthMask) + iLen) >= oled_x) // if it will hit the page end
+     {
+        j = oled_x - (iScreenOffset & iWidthMask); // amount we can write in one shot
+        memcpy_P(ucTemp, s, j);
+        oledWriteDataBlock(ucTemp, j, 1);
+        s += j;
+        iLen -= j;
+        iScreenOffset = (iScreenOffset + j) & iSizeMask;
+        oledSetPosition(iScreenOffset & iWidthMask, (iScreenOffset >> iWidthShift), 1);
+     } // while it needs some help
+  memcpy_P(ucTemp, s, iLen);
+  oledWriteDataBlock(ucTemp, iLen, 1);
+  iScreenOffset = (iScreenOffset + iLen) & iSizeMask;
+} /* oledWriteFlashBlock() */
+
+//
+// Write a repeating byte to the display
+//
+void oledRepeatByte(byte b, int iLen)
+{
+int j;
+int iWidthMask = oled_x -1;
+int iWidthShift = (oled_x == 128) ? 7:6; // assume 128 or 64 pixels wide
+int iSizeMask = ((oled_x * oled_y)/8) -1;
+uint8_t ucTemp[128];
+
+     memset(ucTemp, b, (iLen > 128) ? 128:iLen);
+     while (((iScreenOffset & iWidthMask) + iLen) >= oled_x) // if it will hit the page end
+     {
+        j = oled_x - (iScreenOffset & iWidthMask); // amount we can write in one shot
+        oledWriteDataBlock(ucTemp, j, 1);
+        iLen -= j;
+        iScreenOffset = (iScreenOffset + j) & iSizeMask;
+        oledSetPosition(iScreenOffset & iWidthMask, (iScreenOffset >> iWidthShift), 1);
+     } // while it needs some help
+  oledWriteDataBlock(ucTemp, iLen, 1);
+  iScreenOffset += iLen;
+} /* oledRepeatByte() */
+
+//
+// Play a frame of animation data
+// The animation data is assumed to be encoded for a full frame of the display
+// Given the pointer to the start of the compressed data,
+// it returns the pointer to the start of the next frame
+// Frame rate control is up to the calling program to manage
+// When it finishes the last frame, it will start again from the beginning
+//
+uint8_t * oledPlayAnimFrame(uint8_t *pAnimation, uint8_t *pCurrent, int iLen)
+{
+byte *s;
+int i, j;
+unsigned char b, bCode;
+int iBufferSize = (oled_x * oled_y)/8; // size in bytes of the display devce
+int iWidthMask, iWidthShift;
+
+  iWidthMask = oled_x - 1;
+  iWidthShift = (oled_x == 128) ? 7:6; // 128 or 64 pixels wide
+  if (pCurrent == NULL || pCurrent > pAnimation + iLen)
+     return NULL; // invalid starting point
+
+  s = (byte *)pCurrent; // start of animation data
+  i = 0;
+  oledSetPosition(0,0,1);
+  while (i < iBufferSize) // run one frame
+  {
+    bCode = pgm_read_byte(s++);
+    switch (bCode & OP_MASK) // different compression types
+    {
+      case OP_SKIPCOPY: // skip/copy
+        if (bCode == OP_SKIPCOPY) // big skip
+        {
+           b = pgm_read_byte(s++);
+           i += b + 1;
+           oledSetPosition(i & iWidthMask, (i >> iWidthShift), 1);
+        }
+        else // skip/copy
+        {
+          if (bCode & 0x38)
+          {
+            i += ((bCode & 0x38) >> 3); // skip amount
+            oledSetPosition(i & iWidthMask, (i >> iWidthShift), 1);
+          }
+          if (bCode & 7)
+          {
+             oledWriteFlashBlock(s, bCode & 7);
+             s += (bCode & 7);
+             i += bCode & 7;
+          }
+       }
+       break;
+     case OP_COPYSKIP: // copy/skip
+       if (bCode == OP_COPYSKIP) // big copy
+       {
+         b = pgm_read_byte(s++);
+         j = b + 1;
+         oledWriteFlashBlock(s, j);
+         s += j;
+         i += j;
+       }
+       else
+       {
+         j = ((bCode & 0x38) >> 3);
+         if (j)
+         {
+           oledWriteFlashBlock(s, j);
+           s += j;
+           i += j;
+         }
+         if (bCode & 7)
+         {
+           i += (bCode & 7); // skip
+           oledSetPosition(i & iWidthMask, (i >> iWidthShift), 1);
+         }
+       }
+       break;
+     case OP_REPEATSKIP: // repeat/skip
+       j = (bCode & 0x38) >> 3; // repeat count
+       b = pgm_read_byte(s++);
+       oledRepeatByte(b, j);
+       i += j;
+       if (bCode & 7)
+       {
+         i += (bCode & 7); // skip amount
+         oledSetPosition(i & iWidthMask, (i >> iWidthShift), 1);
+       }
+       break;
+                  
+     case OP_REPEAT:
+       j = (bCode & 0x3f) + 1;
+       b = pgm_read_byte(s++);
+       oledRepeatByte(b, j);
+       i += j;
+       break;  
+    } // switch on code type
+  } // while rendering a frame
+  if (s >= pAnimation + iLen) // we've hit the end, restart from the beginning
+     s = pAnimation;
+  return s; // return pointer to start of next frame
+} /* oledPlayAnimFrame() */
 
 //
 // Draw a 16x16 tile in any of 4 rotated positions
