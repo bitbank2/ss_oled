@@ -40,6 +40,7 @@ Features:<br>
 - Optimized Bresenham line drawing<br>
 - Optional backing RAM for drawing pixels for systems with enough RAM<br>
 - 16x16 Tile/Sprite drawing at any angle.
+- Run full frame animations at high frame rates with a simple API
 - Light enough to run on an ATtiny85<br> 
 <br>
 This code depends on the BitBang_I2C library. You can download it here:<br>
