@@ -609,6 +609,7 @@ static void _I2CWrite(unsigned char *pData, int iLen)
 #else // Arduino
 static void _I2CWrite(unsigned char *pData, int iLen)
 {
+#if !defined( __AVR_ATtiny85__ )
   if (iCSPin != -1) // we're writing to SPI, treat it differently
   {
     digitalWrite(iDCPin, (pData[0] == 0) ? LOW : HIGH); // data versus command
@@ -624,6 +625,7 @@ static void _I2CWrite(unsigned char *pData, int iLen)
     digitalWrite(iCSPin, HIGH);
   }
   else // must be I2C
+#endif // !ATtiny85
   {
     I2CWrite(oled_addr, pData, iLen);
   } // I2C
