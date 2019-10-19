@@ -73,7 +73,7 @@ void oledSetContrast(unsigned char ucContrast);
 // Pass the pointer to the beginning of the BMP file
 // First pass version assumes a full screen bitmap
 //
-int oledLoadBMP(uint8_t *pBMP, int bRender);
+int oledLoadBMP(uint8_t *pBMP, int bInvert, int bRender);
 //
 // Power up/down the display
 // useful for low power situations
@@ -164,7 +164,7 @@ int oledScrollBuffer(int iStartCol, int iEndCol, int iStartRow, int iEndRow, int
 // The function can draw the tile on byte boundaries, so the x value
 // can be from 0 to 112 and y can be from 0 to 6
 //
-void oledDrawTile(const uint8_t *pTile, int x, int y, int iRotation, int bRender);
+void oledDrawTile(const uint8_t *pTile, int x, int y, int iRotation, int bInvert, int bRender);
 
 #if defined(_LINUX_) && defined(__cplusplus)
 }

@@ -565,6 +565,7 @@ static int iSDAPin, iSCLPin;
 //static byte bCache[MAX_CACHE] = {0x40}; // for faster character drawing
 //static byte bEnd = 1;
 static void oledWriteCommand(unsigned char c);
+void InvertBytes(uint8_t *pData, uint8_t bLen);
 
 // wrapper/adapter functions to make the code work on Linux
 #ifdef _LINUX_
@@ -1158,7 +1159,7 @@ int iWidthMask, iWidthShift;
 // The function can draw the tile on byte boundaries, so the x value
 // can be from 0 to 112 and y can be from 0 to 6
 //
-void oledDrawTile(const uint8_t *pTile, int x, int y, int iRotation, int bRender)
+void oledDrawTile(const uint8_t *pTile, int x, int y, int iRotation, int bInvert, int bRender)
 {
     uint8_t ucTemp[32]; // prepare LCD data here
     uint8_t i, j, k, iOffset, ucMask, uc, ucPixels;
@@ -1229,6 +1230,7 @@ void oledDrawTile(const uint8_t *pTile, int x, int y, int iRotation, int bRender
             } // for i
         } // for j
     }
+    if (bInvert) InvertBytes(ucTemp, 32);
     // Send the data to the display
     oledSetPosition(x, y, bRender);
     oledWriteDataBlock(ucTemp, 16, bRender); // top half
@@ -1312,7 +1314,7 @@ uint8_t i;
 // Pass the pointer to the beginning of the BMP file
 // First pass version assumes a full screen bitmap
 //
-int oledLoadBMP(uint8_t *pBMP, int bRender)
+int oledLoadBMP(uint8_t *pBMP, int bInvert, int bRender)
 {
 int16_t i16;
 int iOffBits, q, y, j; // offset to bitmap data
@@ -1368,6 +1370,7 @@ uint8_t bFlipped = false;
             } // for q
             s++; // next source byte
          } // for x
+         if (bInvert) InvertBytes(ucTemp, 16);
          oledWriteDataBlock(ucTemp, 16, bRender);
      } // for j
   } // for y
