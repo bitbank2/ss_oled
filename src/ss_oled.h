@@ -101,10 +101,17 @@ void oledSetTextWrap(int bWrap);
 // The text can optionally wrap around to the next line by calling oledSetTextWrap(true);
 // otherwise text which would go off the right edge will not be drawn and the cursor will
 // be left "off screen" until set to a new position explicitly
+// Calling one of the four named oledWriteStrings[size] routines may save 700 to 2000 bytes of
+// Flash memory if you only use one or two font sizes in your program.
 //
 //  Returns 0 for success, -1 for invalid parameter
 //
 int oledWriteString(int iScrollX, int x, int y, char *szMsg, int iSize, int bInvert, int bRender);
+int oledWriteStringNormal(int iScrollX, int x, int y, char *szMsg, int bInvert, int bRender);
+int oledWriteStringLarge(int iScrollX, int x, int y, char *szMsg, int bInvert, int bRender);
+int oledWriteStringStretched(int iScrollX, int x, int y, char *szMsg, int bInvert, int bRender);
+int oledWriteStringSmall(int iScrollX, int x, int y, char *szMsg, int bInvert, int bRender);
+
 //
 // Fill the frame buffer with a byte pattern
 // e.g. all off (0x00) or all on (0xff)
@@ -171,4 +178,3 @@ void oledDrawTile(const uint8_t *pTile, int x, int y, int iRotation, int bInvert
 #endif // _LINUX_
 
 #endif // __SS_OLED_H__
-
