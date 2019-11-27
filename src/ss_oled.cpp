@@ -107,7 +107,7 @@ const uint8_t ucFont[]PROGMEM = {
   0x02,0x03,0x01,0x03,0x02,0x03,0x01,0x00,0x70,0x78,0x4c,0x46,0x4c,0x78,0x70,0x00};
 // AVR MCUs have very little memory; save 6K of FLASH by stretching the 'normal'
 // font instead of using this large font
-#ifndef __AVR__
+//#ifndef __AVR__
 const uint8_t ucBigFont[]PROGMEM = {
   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
@@ -493,7 +493,7 @@ const uint8_t ucBigFont[]PROGMEM = {
   0xfc,0xfc,0xff,0xff,0x03,0x03,0x00,0x00,0x03,0x03,0xff,0xff,0xfc,0xfc,0x00,0x00,
   0x03,0x03,0x03,0x03,0x03,0x03,0x03,0x03,0x03,0x03,0x03,0x03,0x03,0x03,0x00,0x00,
   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-#endif // !__AVR__
+//#endif // !__AVR__
 
   // 5x7 font (in 6x8 cell)
 const uint8_t ucSmallFont[]PROGMEM = {
@@ -1398,6 +1398,34 @@ void oledSetTextWrap(int bWrap)
 //
 int oledWriteString(int iScroll, int x, int y, char *szMsg, int iSize, int bInvert, int bRender)
 {
+
+    if (iSize == FONT_NORMAL) // 8x8 font
+    {
+       oledWriteStringNormal(iScroll, x, y, szMsg, bInvert, bRender);
+       return 0;
+    } // 8x8
+#ifndef __AVR__
+    else if (iSize == FONT_LARGE) // 16x32 font
+    {
+      oledWriteStringLarge(iScroll, x, y, szMsg, bInvert, bRender);
+      return 0;
+    } // 16x32
+#endif // !__AVR__
+    else if (iSize == FONT_STRETCHED) // 8x8 stretched to 16x16
+    {
+      oledWriteStringStretched(iScroll, x, y, szMsg, bInvert, bRender);
+      return 0;
+    } // 16x16
+    else if (iSize == FONT_SMALL) // 6x8 font
+    {
+      oledWriteStringSmall(iScroll, x, y, szMsg, bInvert, bRender);
+      return 0;
+    } // 6x8
+  return -1; // invalid size
+} /* oledWriteString() */
+
+int oledWriteStringNormal(int iScroll, int x, int y, char *szMsg, int bInvert, int bRender)
+{
 int i, iFontOff, iLen, iFontSkip;
 unsigned char c, *s, ucTemp[40];
 
@@ -1413,8 +1441,8 @@ unsigned char c, *s, ucTemp[40];
        return -1; // can't draw off the display
 
     oledSetPosition(iCursorX, iCursorY, bRender);
-    if (iSize == FONT_NORMAL) // 8x8 font
-    {
+//    if (iSize == FONT_NORMAL) // 8x8 font
+//    {
        i = 0;
        iFontSkip = iScroll & 7; // number of columns to initially skip
        while (iCursorX < oled_x && szMsg[i] != 0 && iCursorY < oled_y / 8)
@@ -1445,10 +1473,28 @@ unsigned char c, *s, ucTemp[40];
        } // while
 //     oledCachedFlush(); // write any remaining data
        return 0;
-    } // 8x8
-#ifndef __AVR__
-    else if (iSize == FONT_LARGE) // 16x32 font
+//    } // 8x8
+} // oledWriteScringNormal
+
+int oledWriteStringLarge(int iScroll, int x, int y, char *szMsg, int bInvert, int bRender)
+{
+int i, iFontOff, iLen, iFontSkip;
+unsigned char c, *s, ucTemp[40];
+
+    if (x == -1 || y == -1) // use the cursor position
     {
+      x = iCursorX; y = iCursorY;
+    }
+    else
+    {
+      iCursorX = x; iCursorY = y; // set the new cursor position
+    }
+    if (iCursorX >= oled_x || iCursorY >= oled_y / 8)
+       return -1; // can't draw off the display
+
+    oledSetPosition(iCursorX, iCursorY, bRender);
+//    else if (iSize == FONT_LARGE) // 16x32 font
+//    {
       i = 0;
       iFontSkip = iScroll & 15; // number of columns to initially skip
       while (iCursorX < oled_x && iCursorY < (oled_y / 8)-3 && szMsg[i] != 0)
@@ -1494,10 +1540,28 @@ unsigned char c, *s, ucTemp[40];
           i++;
        } // while
        return 0;
-    } // 16x32
-#endif // !__AVR__
-    else if (iSize == FONT_STRETCHED) // 8x8 stretched to 16x16
+//    } // 16x32
+} // oledWriteStringLarge
+
+int oledWriteStringStretched(int iScroll, int x, int y, char *szMsg, int bInvert, int bRender)
+{
+int i, iFontOff, iLen, iFontSkip;
+unsigned char c, *s, ucTemp[40];
+
+    if (x == -1 || y == -1) // use the cursor position
     {
+      x = iCursorX; y = iCursorY;
+    }
+    else
+    {
+      iCursorX = x; iCursorY = y; // set the new cursor position
+    }
+    if (iCursorX >= oled_x || iCursorY >= oled_y / 8)
+       return -1; // can't draw off the display
+
+    oledSetPosition(iCursorX, iCursorY, bRender);
+//    else if (iSize == FONT_STRETCHED) // 8x8 stretched to 16x16
+//    {
       i = 0;
       iFontSkip = iScroll & 15; // number of columns to initially skip
       while (iCursorX < oled_x && iCursorY < (oled_y/8)-1 && szMsg[i] != 0)
@@ -1553,9 +1617,28 @@ unsigned char c, *s, ucTemp[40];
           i++;
       } // while
       return 0;
-    } // 16x16
-    else if (iSize == FONT_SMALL) // 6x8 font
+//    } // 16x16
+} // oldWriteStringStretched
+
+int oledWriteStringSmall(int iScroll, int x, int y, char *szMsg, int bInvert, int bRender)
+{
+int i, iFontOff, iLen, iFontSkip;
+unsigned char c, *s, ucTemp[40];
+
+    if (x == -1 || y == -1) // use the cursor position
     {
+      x = iCursorX; y = iCursorY;
+    }
+    else
+    {
+      iCursorX = x; iCursorY = y; // set the new cursor position
+    }
+    if (iCursorX >= oled_x || iCursorY >= oled_y / 8)
+       return -1; // can't draw off the display
+
+    oledSetPosition(iCursorX, iCursorY, bRender);
+//    else if (iSize == FONT_SMALL) // 6x8 font
+//    {
        i = 0;
        iFontSkip = iScroll % 6;
        while (iCursorX < oled_x && iCursorY < (oled_y/8) && szMsg[i] != 0)
@@ -1585,10 +1668,8 @@ unsigned char c, *s, ucTemp[40];
        }
 //    oledCachedFlush(); // write any remaining data      
       return 0;
-    } // 6x8
-  return -1; // invalid size
-} /* oledWriteString() */
-
+//    } // 6x8
+} // oledWriteStringSmall
 //
 // Render a sprite/rectangle of pixels from a provided buffer to the display.
 // The row values refer to byte rows, not pixel rows due to the memory
@@ -1833,4 +1914,3 @@ void oledDrawLine(int x1, int y1, int x2, int y2, int bRender)
   } // y major case
 } /* oledDrawLine() */
 #endif // USE_BACKBUFFER
-
