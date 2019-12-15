@@ -3,6 +3,16 @@
 //
 #include <ss_oled.h>
 
+// if your system doesn't have enough RAM for a back buffer, comment out
+// this line (e.g. ATtiny85)
+#define USE_BACKBUFFER
+
+#ifdef USE_BACKBUFFER
+static uint8_t ucBackBuffer[1024];
+#else
+static uint8_t *ucBackBuffer = NULL;
+#endif
+
 void setup() {
 int rc;
   // put your setup code here, to run once:
@@ -13,6 +23,7 @@ rc = oledInit(OLED_128x64, 0, 0, -1, -1,400000L); // use standard I2C bus at 400
     char *msgs[] = {"SSD1306 @ 0x3C", "SSD1306 @ 0x3D","SH1106 @ 0x3C","SH1106 @ 0x3D"};
     oledFill(0, 1);
     oledWriteString(0,0,0,msgs[rc], FONT_NORMAL, 0, 1);
+    oledSetBackBuffer(ucBackBuffer);
     delay(2000);
   }
 }
@@ -27,6 +38,9 @@ char szTemp[32];
   oledWriteString(0,0,1,(char *)"Written by Larry Bank", FONT_SMALL, 1, 1);
   oledWriteString(0,0,3,(char *)"**Demo**", FONT_LARGE, 0, 1);
   delay(2000);
+  
+ // Pixel and line functions won't work without a back buffer
+#ifdef USE_BACKBUFFER
   oledFill(0, 1);
   for (i=0; i<3000; i++)
   {
@@ -35,12 +49,6 @@ char szTemp[32];
     oledSetPixel(x, y, 1, 1);
   }
   delay(2000);
-//
-// By default, the line drawing function is disabled on AVR since it requires a backing buffer (1K RAM)
-// Which is usually a large % on most of the AVRs (Arduino UNO only has 2K RAM total)
-// To enable this functionality, define USE_BACKBUFFER at the beginning of ss_oled.cpp
-//
-#ifndef __AVR__
   oledFill(0, 1);
   for (x=0; x<127; x+=2)
   {
@@ -51,5 +59,5 @@ char szTemp[32];
     oledDrawLine(127,y, 0,63-y, 1);
   }
   delay(2000);
-#endif // !__AVR__
+#endif
 } /* main() */

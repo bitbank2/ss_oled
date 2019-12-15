@@ -61,6 +61,14 @@ int oledInit(int iType, int bFlip, int bInvert, int iSDAPin, int iSCLPin, int32_
 void oledSPIInit(int iType, int iDC, int iCS, int iReset, int bFlip, int bInvert, int32_t iSpeed);
 
 //
+// Provide or revoke a back buffer for your OLED graphics
+// This allows you to manage the RAM used by ss_oled on tiny
+// embedded platforms like the ATmega series
+// Pass NULL to revoke the buffer. Make sure you provide a buffer
+// large enough for your display (e.g. 128x64 needs 1K - 1024 bytes)
+//
+void oledSetBackBuffer(uint8_t *pBuffer);
+//
 // Sends a command to turn off the OLED display
 //
 void oledShutdown();
@@ -136,10 +144,6 @@ int oledDrawGFX(uint8_t *pSrc, int iSrcCol, int iSrcRow, int iDestCol, int iDest
 // Draw a line between 2 points
 //
 void oledDrawLine(int x1, int y1, int x2, int y2, int bRender);
-//
-// Get the buffer pointer for direct manipulation of the pixels
-//
-uint8_t * oledGetBuffer(void);
 //
 // Play a frame of animation data
 // The animation data is assumed to be encoded for a full frame of the display

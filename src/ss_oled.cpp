@@ -48,14 +48,6 @@ static int file_i2c = 0;
 #endif // _LINUX_
 #include <ss_oled.h>
 
-//
-// For non-AVR micros, 1K of RAM isn't fatal
-//
-#ifndef __AVR__
-#define USE_BACKBUFFER
-#endif // !__AVR__
-
-// small (8x8) font
 const uint8_t ucFont[]PROGMEM = {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x06,0x5f,0x5f,0x06,0x00,0x00,
 0x00,0x07,0x07,0x00,0x07,0x07,0x00,0x00,0x14,0x7f,0x7f,0x14,0x7f,0x7f,0x14,0x00,
@@ -554,9 +546,7 @@ const unsigned char oled72_initbuf[]={0x00,0xae,0xa8,0x3f,0xd3,0x00,0x40,0xa1,0x
 // some globals
 static int iCSPin, iDCPin, iResetPin;
 static int iScreenOffset; // current write offset of screen data
-#ifdef USE_BACKBUFFER
-static unsigned char ucScreen[2048]; // local copy of the image buffer
-#endif
+static uint8_t *ucScreen; // backbuffer provided by the user
 static int oled_wrap, oled_flip, oled_addr, oled_type;
 static int iCursorX, iCursorY;
 static uint8_t oled_x, oled_y; // width and height of the display
@@ -680,6 +670,7 @@ void oledSPIInit(int iType, int iDC, int iCS, int iReset, int bFlip, int bInvert
 uint8_t uc[32], *s;
 int iLen;
 
+  ucScreen = NULL; // start with no backbuffer; user must provide one later
   iDCPin = iDC;
   iCSPin = iCS;
   iResetPin = iReset;
@@ -753,6 +744,7 @@ int oledInit(int iType, int bFlip, int bInvert, int sda, int scl, int32_t iSpeed
 unsigned char uc[4];
 int rc = OLED_NOT_FOUND;
 
+  ucScreen = NULL; // reset backbuffer; user must provide one later
   oled_type = iType;
   oled_flip = bFlip;
   oled_wrap = 0; // default - disable text wrap
@@ -878,7 +870,6 @@ void oledSetContrast(unsigned char ucContrast)
 {
   oledWriteCommand2(0x81, ucContrast);
 } /* oledSetContrast() */
-#ifdef USE_BACKBUFFER
 //
 // Scroll the internal buffer by 1 scanline (up/down)
 // width is in pixels, lines is group of 8 rows
@@ -925,7 +916,6 @@ int oledScrollBuffer(int iStartCol, int iEndCol, int iStartRow, int iEndRow, int
     }
     return 0;
 } /* oledScrollBuffer() */
-#endif // USE_BACKBUFFER
 //
 // Send commands to position the "cursor" (aka memory write address)
 // to the given row and column
@@ -986,11 +976,12 @@ unsigned char ucTemp[129];
       _I2CWrite(ucTemp, iLen+1);
   }
   // Keep a copy in local buffer
-#ifdef USE_BACKBUFFER
-  memcpy(&ucScreen[iScreenOffset], ucBuf, iLen);
-  iScreenOffset += iLen;
-  iScreenOffset &= ((oled_x * oled_y / 8) - 1);
-#endif
+  if (ucScreen)
+  {
+    memcpy(&ucScreen[iScreenOffset], ucBuf, iLen);
+    iScreenOffset += iLen;
+    iScreenOffset &= ((oled_x * oled_y / 8) - 1);
+  }
 }
 //
 // Byte operands for compressing the data
@@ -1251,12 +1242,11 @@ unsigned char uc, ucOld;
     return -1;
   oledSetPosition(x, y>>3, bRender);
 
-#ifdef USE_BACKBUFFER
-  uc = ucOld = ucScreen[i];
-#else
-  if (oled_type == OLED_132x64 || oled_type == OLED_128x128) // SH1106/SH1107 can read data
+  if (ucScreen)
+    uc = ucOld = ucScreen[i];
+  else if (oled_type == OLED_132x64 || oled_type == OLED_128x128) // SH1106/SH1107 can read data
   {
-  uint8_t ucTemp[3];
+    uint8_t ucTemp[3];
      ucTemp[0] = 0x80; // one command
      ucTemp[1] = 0xE0; // read_modify_write
      ucTemp[2] = 0xC0; // one data
@@ -1268,7 +1258,6 @@ unsigned char uc, ucOld;
   }
   else
      uc = ucOld = 0;
-#endif
 
   uc &= ~(0x1 << (y & 7));
   if (ucColor)
@@ -1278,20 +1267,20 @@ unsigned char uc, ucOld;
   if (uc != ucOld) // pixel changed
   {
 //    oledSetPosition(x, y>>3);
-#ifdef USE_BACKBUFFER
-    oledWriteDataBlock(&uc, 1, bRender);
-    ucScreen[i] = uc;
-#else
-    if (oled_type == OLED_132x64 || oled_type == OLED_128x128) // end the read_modify_write operation
+    if (ucScreen)
     {
-    uint8_t ucTemp[4];
+      oledWriteDataBlock(&uc, 1, bRender);
+      ucScreen[i] = uc;
+    }
+    else if (oled_type == OLED_132x64 || oled_type == OLED_128x128) // end the read_modify_write operation
+    {
+      uint8_t ucTemp[4];
       ucTemp[0] = 0xc0; // one data
       ucTemp[1] = uc;   // actual data
       ucTemp[2] = 0x80; // one command
       ucTemp[3] = 0xEE; // end read_modify_write operation
       _I2CWrite(ucTemp, 4);
     }
-#endif
   }
   return 0;
 } /* oledSetPixel() */
@@ -1621,13 +1610,13 @@ void oledDumpBuffer(uint8_t *pBuffer)
 int x, y;
 int iLines, iCols;
 uint8_t bNeedPos;
-#ifdef USE_BACKBUFFER
 uint8_t *pSrc = ucScreen;
     
-    if (pBuffer == NULL) // dump the internal buffer if none is given
-        pBuffer = ucScreen;
-#endif
-    
+  if (pBuffer == NULL) // dump the internal buffer if none is given
+    pBuffer = ucScreen;
+  if (pBuffer == NULL)
+    return; // no backbuffer and no provided buffer
+  
   iLines = oled_y >> 3;
   iCols = oled_x >> 4;
   for (y=0; y<iLines; y++)
@@ -1635,11 +1624,7 @@ uint8_t *pSrc = ucScreen;
     bNeedPos = 1; // start of a new line means we need to set the position too
     for (x=0; x<iCols; x++) // wiring library has a 32-byte buffer, so send 16 bytes so that the data prefix (0x40) can fit
     {
-#ifdef USE_BACKBUFFER
-      if (pSrc == pBuffer || memcmp(pSrc, pBuffer, 16) != 0) // doesn't match, need to send it
-#else
-      if (1)
-#endif
+      if (ucScreen == NULL || memcmp(pSrc, pBuffer, 16) != 0) // doesn't match, need to send it
       {
         if (bNeedPos) // need to reposition output cursor?
         {
@@ -1652,17 +1637,12 @@ uint8_t *pSrc = ucScreen;
       {
          bNeedPos = 1; // we're skipping a block, so next time will need to set the new position
       }
-#ifdef USE_BACKBUFFER
       pSrc += 16;
-#endif
       pBuffer += 16;
     } // for x
-#ifdef USE_BACKBUFFER
     pSrc += (128 - oled_x); // for narrow displays, skip to the next line
-#endif
     pBuffer += (128 - oled_x);
   } // for y
-
 } /* oledDumpBuffer() */
 //
 // Fill the frame buffer with a byte pattern
@@ -1690,21 +1670,21 @@ unsigned char temp[16];
     if (oled_type == OLED_72x40)
        oledWriteDataBlock(temp, 8, bRender);
   } // for y
-#ifdef USE_BACKBUFFER
-   memset(ucScreen, ucData, 1024);
-#endif
+  if (ucScreen)
+    memset(ucScreen, ucData, (oled_x * oled_y)/8);
 } /* oledFill() */
 
-#ifdef USE_BACKBUFFER
 //
-// Return the pointer to the internal back buffer
-// this allows a sketch to do direct manipulation of the pixels
-// and later use oledDumpBuffer() to draw the updated display
+// Provide or revoke a back buffer for your OLED graphics
+// This allows you to manage the RAM used by ss_oled on tiny
+// embedded platforms like the ATmega series
+// Pass NULL to revoke the buffer. Make sure you provide a buffer
+// large enough for your display (e.g. 128x64 needs 1K - 1024 bytes)
 //
-uint8_t * oledGetBuffer(void)
+void oledSetBackBuffer(uint8_t *pBuffer)
 {
-  return (uint8_t *)&ucScreen[0];
-} /* oledGetBuffer() */
+  ucScreen = pBuffer;
+} /* oledSetBackBuffer() */
 
 void oledDrawLine(int x1, int y1, int x2, int y2, int bRender)
 {
@@ -1832,5 +1812,4 @@ void oledDrawLine(int x1, int y1, int x2, int y2, int bRender)
     }
   } // y major case
 } /* oledDrawLine() */
-#endif // USE_BACKBUFFER
 
