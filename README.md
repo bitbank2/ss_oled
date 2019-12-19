@@ -19,28 +19,24 @@ SH1107).<br>
 I try to support as many OLEDs as I can. I was able to justify buying a bunch
 of different sized SSD1306 displays because they're around $2 each. A generous patron
 donated money so that I could purchase Pimoroni's 128x128 OLED and add support for it.
-It uses the SH1107 controller and behaves very similarly to the SH1106. The only issue
-which may cause some problems for people is that the backing buffer now is set to 2K
-instead of 1K. It's disabled by default on AVR, but if you manually enable it on an AVR
-and are not using a 128x128 display, make sure to change the buffer size or you won't
-have enough RAM.
+It uses the SH1107 controller and behaves very similarly to the SH1106.
 <br>
 
 Features:<br>
 ---------<br>
-- Automatically detects the display address and type (I2C only)
+- Automatically detects the display address and type (I2C only)<br>
 - Supports 72x40, 96x16, 64x32, 128x32, 128x64, 128x128 (SH1107) and 132x64 (SH1106) display sizes<br>
-- Drive displays from I2C, SPI or any 2 GPIO pins (virtual I2C)
+- Drive displays from I2C, SPI or any 2 GPIO pins (virtual I2C)<br>
 - 4 sizes of fixed fonts (6x8, 8x8, 16x16, 16x32)<br>
-- Deferred rendering allows preparing a back buffer, then displaying it
-- Text scrolling features (vertical and horizontal)
-- Text cursor position with optional line wrap
+- Deferred rendering allows preparing a back buffer, then displaying it (usually faster)<br>
+- Text scrolling features (vertical and horizontal)<br>
+- Text cursor position with optional line wrap<br>
 - a function to load a Windows BMP file<br>
 - Pixel drawing on SH1106/7 without needing backing RAM<br>
 - Optimized Bresenham line drawing<br>
 - Optional backing RAM for drawing pixels for systems with enough RAM<br>
-- 16x16 Tile/Sprite drawing at any angle.
-- Run full frame animations at high frame rates with a simple API
+- 16x16 Tile/Sprite drawing at any angle.<br>
+- Run full frame animations at high frame rates with a simple API<br>
 - Light enough to run on an ATtiny85<br> 
 <br>
 This code depends on the BitBang_I2C library. You can download it here:<br>
