@@ -1624,7 +1624,7 @@ uint8_t *pSrc = ucScreen;
     bNeedPos = 1; // start of a new line means we need to set the position too
     for (x=0; x<iCols; x++) // wiring library has a 32-byte buffer, so send 16 bytes so that the data prefix (0x40) can fit
     {
-      if (ucScreen == NULL || memcmp(pSrc, pBuffer, 16) != 0) // doesn't match, need to send it
+      if (ucScreen == NULL || pBuffer == pSrc || memcmp(pSrc, pBuffer, 16) != 0) // doesn't match, need to send it
       {
         if (bNeedPos) // need to reposition output cursor?
         {
