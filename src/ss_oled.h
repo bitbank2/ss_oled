@@ -161,6 +161,17 @@ uint8_t * oledPlayAnimFrame(uint8_t *pAnimation, uint8_t *pCurrent, int iLen);
 //
 int oledScrollBuffer(int iStartCol, int iEndCol, int iStartRow, int iEndRow, int bUp);
 //
+// Draw a sprite of any size in any position
+// If it goes beyond the left/right or top/bottom edges
+// it's trimmed to show the valid parts
+// This function requires a back buffer to be defined
+// The priority color (0 or 1) determines which color is painted 
+// when a 1 is encountered in the source image.
+// e.g. when 0, the input bitmap acts like a mask to clear
+// the destination where bits are set.
+//
+void oledDrawSprite(uint8_t *pSprite, int cx, int cy, int iPitch, int x, int y, uint8_t iPriority);
+//
 // Draw a 16x16 tile in any of 4 rotated positions
 // Assumes input image is laid out like "normal" graphics with
 // the MSB on the left and 2 bytes per line

@@ -1141,7 +1141,85 @@ int iWidthMask, iWidthShift;
      s = pAnimation;
   return s; // return pointer to start of next frame
 } /* oledPlayAnimFrame() */
-
+//
+// Draw a sprite of any size in any position
+// If it goes beyond the left/right or top/bottom edges
+// it's trimmed to show the valid parts
+// This function requires a back buffer to be defined
+// The priority color (0 or 1) determines which color is painted 
+// when a 1 is encountered in the source image. 
+//
+void oledDrawSprite(uint8_t *pSprite, int cx, int cy, int iPitch, int x, int y, uint8_t iPriority)
+{
+    int tx, ty, dx, dy, iStartX;
+    uint8_t *s, *d, uc, pix, ucSrcMask, ucDstMask;
+    
+    if (x+cx < 0 || y+cy < 0 || x >= oled_x || y >= oled_y || ucScreen == NULL)
+        return; // no backbuffer or out of bounds
+    dy = y; // destination y
+    if (y < 0) // skip the invisible parts
+    {
+        cy += y;
+        y = -y;
+        pSprite += (y * iPitch);
+        dy = 0;
+    }
+    if (y + cy > oled_y)
+        cy = oled_y - y;
+    iStartX = 0;
+    dx = x;
+    if (x < 0)
+    {
+        cx += x;
+        x = -x;
+        iStartX = x;
+        dx = 0;
+    }
+    if (x + cx > oled_x)
+        cx = oled_x - x;
+    for (ty=0; ty<cy; ty++)
+    {
+        s = &pSprite[iStartX >> 3];
+        d = &ucScreen[(dy>>3) * oled_x + dx];
+        ucSrcMask = 0x80 >> (iStartX & 7);
+        pix = *s++;
+        ucDstMask = 1 << (dy & 7);
+        if (iPriority) // priority color is 1
+        {
+          for (tx=0; tx<cx; tx++)
+          {
+            uc = d[0];
+            if (pix & ucSrcMask) // set pixel in source, set it in dest
+              d[0] = (uc | ucDstMask);
+            d++; // next pixel column
+            ucSrcMask >>= 1;
+            if (ucSrcMask == 0) // read next byte
+            {
+                ucSrcMask = 0x80;
+                pix = *s++;
+            }
+          } // for tx
+        } // priorty color 1
+        else
+        {
+          for (tx=0; tx<cx; tx++)
+          {
+            uc = d[0];
+            if (pix & ucSrcMask) // clr pixel in source, clr it in dest
+              d[0] = (uc & ~ucDstMask);
+            d++; // next pixel column
+            ucSrcMask >>= 1;
+            if (ucSrcMask == 0) // read next byte
+            {
+                ucSrcMask = 0x80;
+                pix = *s++;
+            }
+          } // for tx
+        } // priority color 0
+        dy++;
+        pSprite += iPitch;
+    } // for ty
+} /* oledDrawSprite() */
 //
 // Draw a 16x16 tile in any of 4 rotated positions
 // Assumes input image is laid out like "normal" graphics with
