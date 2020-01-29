@@ -574,6 +574,12 @@ int rc;
   rc = read(file_i2c, pBuf, iLen);
   return (rc > 0);
 }
+int I2CRead(uint8_t addr, uint8_t *pBuf, int iLen)
+{
+int rc;
+  rc = read(file_i2c, pBuf, iLen);
+  return (rc > 0);
+}
 int I2CInit(int iSDAPin, int iSCLPin, int32_t iSpeed)
 {
 char filename[32];
@@ -634,7 +640,7 @@ static void oledCachedFlush(void)
        bEnd = 1;
 } /* oledCachedFlush() */
 
-static void oledCachedWrite(byte *pData, byte bLen)
+static void oledCachedWrite(uint8_t *pData, uint8_t bLen)
 {
 
    if (bEnd + bLen > MAX_CACHE) // need to flush it
@@ -994,7 +1000,7 @@ unsigned char ucTemp[129];
 //
 // Write a block of flash memory to the display
 //
-void oledWriteFlashBlock(byte *s, int iLen)
+void oledWriteFlashBlock(uint8_t *s, int iLen)
 {
 int j;
 int iWidthMask = oled_x -1;
@@ -1020,7 +1026,7 @@ uint8_t ucTemp[128];
 //
 // Write a repeating byte to the display
 //
-void oledRepeatByte(byte b, int iLen)
+void oledRepeatByte(uint8_t b, int iLen)
 {
 int j;
 int iWidthMask = oled_x -1;
@@ -1051,7 +1057,7 @@ uint8_t ucTemp[128];
 //
 uint8_t * oledPlayAnimFrame(uint8_t *pAnimation, uint8_t *pCurrent, int iLen)
 {
-byte *s;
+uint8_t *s;
 int i, j;
 unsigned char b, bCode;
 int iBufferSize = (oled_x * oled_y)/8; // size in bytes of the display devce
@@ -1062,7 +1068,7 @@ int iWidthMask, iWidthShift;
   if (pCurrent == NULL || pCurrent > pAnimation + iLen)
      return NULL; // invalid starting point
 
-  s = (byte *)pCurrent; // start of animation data
+  s = (uint8_t *)pCurrent; // start of animation data
   i = 0;
   oledSetPosition(0,0,1);
   while (i < iBufferSize) // run one frame
@@ -1249,7 +1255,7 @@ void oledDrawTile(const uint8_t *pTile, int x, int y, int iRotation, int bInvert
         {
             for (i=0; i<16; i+=8) // x
             {
-                ucPixels = pgm_read_byte(pTile++);
+                ucPixels = pgm_read_byte((uint8_t*)pTile++);
                 ucMask = 0x80; // MSB is the first source pixel
                 for (k=0; k<8; k++)
                 {
@@ -1277,7 +1283,7 @@ void oledDrawTile(const uint8_t *pTile, int x, int y, int iRotation, int bInvert
         {
             for (i=0; i<16; i+=8) // x
             {
-                ucPixels = pgm_read_byte(pTile++);
+                ucPixels = pgm_read_byte((uint8_t*)pTile++);
                 ucMask = 0x80; // MSB is the first source pixel
                 for (k=0; k<8; k++)
                 {

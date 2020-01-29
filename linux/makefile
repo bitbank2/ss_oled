@@ -8,7 +8,7 @@ libss_oled.a: ss_oled.o
 	sudo cp libss_oled.a /usr/local/lib ;\
 	sudo cp ../src/ss_oled.h /usr/local/include
 
-ss_oled.o: ss_oled.c
+ss_oled.o: ss_oled.c ../src/ss_oled.h ../src/ss_oled.cpp
 	$(CC) $(CFLAGS) -D_LINUX_ ss_oled.c
 
 clean:
