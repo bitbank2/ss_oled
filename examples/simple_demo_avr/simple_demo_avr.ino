@@ -7,7 +7,7 @@
 void setup()
 {
     int rc;
-    rc = oledInit(OLED_128x64, 0, 0, -1, -1, 400000L);       // Standard HW I2C bus at 400Khz
+    rc = oledInit(OLED_128x64, 0, 0, -1, -1, -1, 400000L);       // Standard HW I2C bus at 400Khz
 
     if (rc != OLED_NOT_FOUND)
     {

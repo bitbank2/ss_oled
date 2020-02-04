@@ -20,8 +20,14 @@ static uint8_t *ucBackBuffer = NULL;
 
 void setup() {
 int rc;
-  // put your setup code here, to run once:
-rc = oledInit(OLED_128x64, 0, 0, -1, -1,400000L); // use standard I2C bus at 400Khz
+// The I2C SDA/SCL pins set to -1 means to use the default Wire library
+// If pins were specified, they would be bit-banged in software
+// This isn't inferior to hw I2C and in fact allows you to go faster on certain CPUs
+// The reset pin is optional and I've only seen it needed on larger OLEDs (2.4")
+//    that can be configured as either SPI or I2C
+//
+// oledInit(type, rotate180, invert, SDA_PIN, SCL_PIN, RESET_PIN, speed)
+rc = oledInit(OLED_128x64, 0, 0, -1, -1, -1, 400000L); // use standard I2C bus at 400Khz
   if (rc != OLED_NOT_FOUND)
   {
     char *msgs[] = {(char *)"SSD1306 @ 0x3C", (char *)"SSD1306 @ 0x3D",(char *)"SH1106 @ 0x3C",(char *)"SH1106 @ 0x3D"};

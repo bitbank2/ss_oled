@@ -12,7 +12,8 @@
 // These translate to PORT B, bit 0 (0xB0) and PORT B, bit 1 (0xB1)
 #define SDA_PIN 0xb0
 #define SCL_PIN 0xb1
-
+// Only define this if your display needs to be explicity reset (some 2.42" OLEDs do
+#define RESET_PIN -1
 // Most people have the 0.96" 128x64 SSD1306 OLED display
 // Leave this line alone if you do. 
 // For the Pimoroni 128x128, comment out this line (or delete it)
@@ -524,7 +525,7 @@ const byte bAnimation[] PROGMEM = {
 
 void setup() {
 int rc;
-  rc = oledInit(OLED_TYPE, 0, 0, SDA_PIN, SCL_PIN, 400000L);
+  rc = oledInit(OLED_TYPE, 0, 0, SDA_PIN, SCL_PIN, RESET_PIN, 400000L);
 } /* setup() */
 
 void loop() {

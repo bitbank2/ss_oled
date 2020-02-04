@@ -739,7 +739,7 @@ int iLen;
 //
 // Initializes the OLED controller into "page mode"
 //
-int oledInit(int iType, int bFlip, int bInvert, int sda, int scl, int32_t iSpeed)
+int oledInit(int iType, int bFlip, int bInvert, int sda, int scl, int reset, int32_t iSpeed)
 {
 unsigned char uc[4];
 int rc = OLED_NOT_FOUND;
@@ -750,8 +750,9 @@ int rc = OLED_NOT_FOUND;
   oled_wrap = 0; // default - disable text wrap
   iSDAPin = sda;
   iSCLPin = scl;
+  iResetPin = reset;
 // Disable SPI mode code
-  iCSPin = iDCPin = iResetPin = -1;
+  iCSPin = iDCPin = -1;
 
   I2CInit(sda, scl, iSpeed); // on Linux, SDA = bus number, SCL = device address
 #ifdef _LINUX_
@@ -764,6 +765,17 @@ int rc = OLED_NOT_FOUND;
   else if (I2CTest(0x3d))
      oled_addr = 0x3d;
   else return rc; // no display found!
+  // Reset it
+  if (iResetPin != -1)
+  {
+    pinMode(iResetPin, OUTPUT);
+    digitalWrite(iResetPin, HIGH);
+    delay(50);
+    digitalWrite(iResetPin, LOW);
+    delay(50);
+    digitalWrite(iResetPin, HIGH);
+    delay(10);
+  }
 #endif
   // Detect the display controller (SSD1306, SH1107 or SH1106)
   uint8_t u = 0;
