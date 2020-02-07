@@ -760,6 +760,18 @@ int rc = OLED_NOT_FOUND;
 // Disable SPI mode code
   iCSPin = iDCPin = -1;
 
+// Reset it
+  if (iResetPin != -1)
+  {
+    pinMode(iResetPin, OUTPUT);
+    digitalWrite(iResetPin, HIGH);
+    delay(50);
+    digitalWrite(iResetPin, LOW);
+    delay(50);
+    digitalWrite(iResetPin, HIGH);
+    delay(10);
+  }
+  
   I2CInit(sda, scl, iSpeed); // on Linux, SDA = bus number, SCL = device address
 #ifdef _LINUX_
   oled_addr = (uint8_t)scl;
@@ -771,17 +783,6 @@ int rc = OLED_NOT_FOUND;
   else if (I2CTest(0x3d))
      oled_addr = 0x3d;
   else return rc; // no display found!
-  // Reset it
-  if (iResetPin != -1)
-  {
-    pinMode(iResetPin, OUTPUT);
-    digitalWrite(iResetPin, HIGH);
-    delay(50);
-    digitalWrite(iResetPin, LOW);
-    delay(50);
-    digitalWrite(iResetPin, HIGH);
-    delay(10);
-  }
 #endif
   // Detect the display controller (SSD1306, SH1107 or SH1106)
   uint8_t u = 0;
