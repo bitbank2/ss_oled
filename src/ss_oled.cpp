@@ -40,7 +40,7 @@ static int file_i2c = 0;
 #ifdef __AVR__
 #include <avr/pgmspace.h>
 #endif
-#include <BitBang_I2C.h>
+//#include <BitBang_I2C.h>
 #ifndef __AVR_ATtiny85__
 #include <SPI.h>
 #endif
@@ -545,16 +545,16 @@ const unsigned char oled72_initbuf[]={0x00,0xae,0xa8,0x3f,0xd3,0x00,0x40,0xa1,0x
 
 // some globals
 static int iCSPin, iDCPin, iResetPin;
-static int iScreenOffset; // current write offset of screen data
-static uint8_t *ucScreen; // backbuffer provided by the user
-static int oled_wrap, oled_flip, oled_addr, oled_type;
-static int iCursorX, iCursorY;
-static uint8_t oled_x, oled_y; // width and height of the display
-static int iSDAPin, iSCLPin;
+//static int iScreenOffset; // current write offset of screen data
+//static uint8_t *ucScreen; // backbuffer provided by the user
+//static int oled_wrap, oled_flip, oled_addr, oled_type;
+//static int iCursorX, iCursorY;
+//static uint8_t oled_x, oled_y; // width and height of the display
+//static int iSDAPin, iSCLPin;
 #define MAX_CACHE 32
 //static byte bCache[MAX_CACHE] = {0x40}; // for faster character drawing
 //static byte bEnd = 1;
-static void oledWriteCommand(unsigned char c);
+static void oledWriteCommand(SSOLED *pOLED, unsigned char c);
 void InvertBytes(uint8_t *pData, uint8_t bLen);
 
 // wrapper/adapter functions to make the code work on Linux
@@ -567,20 +567,20 @@ static int16_t pgm_read_word(uint8_t *ptr)
 {
   return ptr[0] + (ptr[1]<<8);
 }
-int I2CReadRegister(uint8_t addr, uint8_t reg, uint8_t *pBuf, int iLen)
+int I2CReadRegister(BBI2C *pI2C, uint8_t addr, uint8_t reg, uint8_t *pBuf, int iLen)
 {
 int rc;
   rc = write(file_i2c, &reg, 1);
   rc = read(file_i2c, pBuf, iLen);
   return (rc > 0);
 }
-int I2CRead(uint8_t addr, uint8_t *pBuf, int iLen)
+int I2CRead(BBI2C *pI2C, uint8_t addr, uint8_t *pBuf, int iLen)
 {
 int rc;
   rc = read(file_i2c, pBuf, iLen);
   return (rc > 0);
 }
-int I2CInit(int iSDAPin, int iSCLPin, int32_t iSpeed)
+int I2CInit(BBI2C *pI2C, int32_t iSpeed)
 {
 char filename[32];
 
@@ -599,12 +599,12 @@ char filename[32];
 
 // Wrapper function to write I2C data
 #ifdef _LINUX_
-static void _I2CWrite(unsigned char *pData, int iLen)
+static void _I2CWrite(BBI2C *pI2C, unsigned char *pData, int iLen)
 {
   write(file_i2c, pData, iLen);
 }
 #else // Arduino
-static void _I2CWrite(unsigned char *pData, int iLen)
+static void _I2CWrite(SSOLED *pOLED, unsigned char *pData, int iLen)
 {
 #if !defined( __AVR_ATtiny85__ )
   if (iCSPin != -1) // we're writing to SPI, treat it differently
@@ -624,7 +624,7 @@ static void _I2CWrite(unsigned char *pData, int iLen)
   else // must be I2C
 #endif // !ATtiny85
   {
-    I2CWrite(oled_addr, pData, iLen);
+    I2CWrite(&pOLED->bbi2c, pOLED->oled_addr, pData, iLen);
   } // I2C
 } /* _I2CWrite() */
 #endif // _LINUX_
@@ -655,13 +655,13 @@ static void oledCachedWrite(uint8_t *pData, uint8_t bLen)
 //
 // Turn off the display
 //
-void oledShutdown(void)
+void oledShutdown(SSOLED *pOLED)
 {
 uint8_t uc[2];
 
     uc[0] = 0; // command
     uc[1] = 0xae; // display off
-    _I2CWrite(uc, 2);
+    _I2CWrite(pOLED, uc, 2);
 #ifdef _LINUX_
     close(file_i2c);
     file_i2c = 0;
@@ -671,6 +671,7 @@ uint8_t uc[2];
 //
 // Initialize the OLED controller for SPI mode
 //
+#ifdef FUTURE
 void oledSPIInit(int iType, int iDC, int iCS, int iReset, int bFlip, int bInvert, int32_t iSpeed)
 {
 uint8_t uc[32], *s;
@@ -722,45 +723,62 @@ int iLen;
      iLen = sizeof(oled64_initbuf);
   }
   memcpy(uc, s, iLen); // do it from RAM
-  _I2CWrite(s, iLen);
+  _I2CWrite(pOLED, s, iLen);
 
   if (bInvert)
   {
     uc[0] = 0; // command
     uc[1] = 0xa7; // invert command
-    _I2CWrite(uc, 2);
+    _I2CWrite(pOLED, uc, 2);
   }
   if (bFlip) // rotate display 180
   {
     uc[0] = 0; // command
     uc[1] = 0xa0;
-    _I2CWrite(uc, 2);
+    _I2CWrite(pOLED, uc, 2);
     uc[0] = 0;
     uc[1] = 0xc0;
-    _I2CWrite(uc, 2);
+    _I2CWrite(pOLED, uc, 2);
   }
 
 } /* oledSPIInit() */
 #endif
+#endif
 //
 // Initializes the OLED controller into "page mode"
 //
-int oledInit(int iType, int bFlip, int bInvert, int sda, int scl, int reset, int32_t iSpeed)
+int oledInit(SSOLED *pOLED, int iType, int iAddr, int bFlip, int bInvert, int bWire, int sda, int scl, int reset, int32_t iSpeed)
 {
 unsigned char uc[4];
 int rc = OLED_NOT_FOUND;
 
-  ucScreen = NULL; // reset backbuffer; user must provide one later
-  oled_type = iType;
-  oled_flip = bFlip;
-  oled_wrap = 0; // default - disable text wrap
-  iSDAPin = sda;
-  iSCLPin = scl;
+  pOLED->ucScreen = NULL; // reset backbuffer; user must provide one later
+  pOLED->oled_type = iType;
+  pOLED->oled_flip = bFlip;
+  pOLED->oled_wrap = 0; // default - disable text wrap
+  pOLED->bbi2c.iSDA = sda;
+  pOLED->bbi2c.iSCL = scl;
+  pOLED->bbi2c.bWire = bWire;
   iResetPin = reset;
 // Disable SPI mode code
   iCSPin = iDCPin = -1;
 
-// Reset it
+  I2CInit(&pOLED->bbi2c, iSpeed); // on Linux, SDA = bus number, SCL = device address
+#ifdef _LINUX_
+  pOLED->oled_addr = (uint8_t)scl;
+#else
+  // find the device address if requested
+  if (iAddr == 0 || iAddr == 0xff) // find it
+  {
+    I2CTest(&pOLED->bbi2c, 0x3c);
+    if (I2CTest(&pOLED->bbi2c, 0x3c))
+       pOLED->oled_addr = 0x3c;
+    else if (I2CTest(&pOLED->bbi2c, 0x3d))
+       pOLED->oled_addr = 0x3d;
+    else
+       return rc; // no display found!
+  }
+  // Reset it
   if (iResetPin != -1)
   {
     pinMode(iResetPin, OUTPUT);
@@ -771,129 +789,117 @@ int rc = OLED_NOT_FOUND;
     digitalWrite(iResetPin, HIGH);
     delay(10);
   }
-  
-  I2CInit(sda, scl, iSpeed); // on Linux, SDA = bus number, SCL = device address
-#ifdef _LINUX_
-  oled_addr = (uint8_t)scl;
-#else
-  // find the device address
-  oled_addr = 0;
-  if (I2CTest(0x3c))
-     oled_addr = 0x3c;
-  else if (I2CTest(0x3d))
-     oled_addr = 0x3d;
-  else return rc; // no display found!
 #endif
   // Detect the display controller (SSD1306, SH1107 or SH1106)
   uint8_t u = 0;
-  I2CReadRegister(oled_addr, 0x00, &u, 1); // read the status register
+  I2CReadRegister(&pOLED->bbi2c, pOLED->oled_addr, 0x00, &u, 1); // read the status register
   u &= 0x0f; // mask off power on/off bit
   if (u == 0x7 || u == 0xf) // SH1107
   {
-    oled_type = OLED_128x128;
+    pOLED->oled_type = OLED_128x128;
     rc = OLED_SH1107_3C;
     bFlip = !bFlip; // SH1107 seems to have this reversed from the usual direction
   }
   else if (u == 0x8) // SH1106
   {
     rc = OLED_SH1106_3C;
-    oled_type = OLED_132x64; // needs to be treated a little differently
+    pOLED->oled_type = OLED_132x64; // needs to be treated a little differently
   }
   else if (u == 3 || u == 6) // 6=128x64 display, 3=smaller
   {
     rc = OLED_SSD1306_3C;
   }
-  if (oled_addr == 0x3d)
+  if (pOLED->oled_addr == 0x3d)
      rc++; // return the '3D' version of the type
 
   if (iType == OLED_128x32 || iType == OLED_96x16)
-     _I2CWrite((unsigned char *)oled32_initbuf, sizeof(oled32_initbuf));
+     _I2CWrite(pOLED,(unsigned char *)oled32_initbuf, sizeof(oled32_initbuf));
   else if (iType == OLED_128x128)
-     _I2CWrite((unsigned char *)oled128_initbuf, sizeof(oled128_initbuf));
+     _I2CWrite(pOLED,(unsigned char *)oled128_initbuf, sizeof(oled128_initbuf));
   else if (iType == OLED_72x40)
-     _I2CWrite((unsigned char *)oled72_initbuf, sizeof(oled72_initbuf));
+     _I2CWrite(pOLED,(unsigned char *)oled72_initbuf, sizeof(oled72_initbuf));
   else // 132x64, 128x64 and 64x32
-     _I2CWrite((unsigned char *)oled64_initbuf, sizeof(oled64_initbuf));
+     _I2CWrite(pOLED,(unsigned char *)oled64_initbuf, sizeof(oled64_initbuf));
   if (bInvert)
   {
     uc[0] = 0; // command
     uc[1] = 0xa7; // invert command
-    _I2CWrite(uc, 2);
+    _I2CWrite(pOLED,uc, 2);
   }
   if (bFlip) // rotate display 180
   {
     uc[0] = 0; // command
     uc[1] = 0xa0;
-    _I2CWrite(uc, 2);
+    _I2CWrite(pOLED,uc, 2);
     uc[1] = 0xc0;
-    _I2CWrite(uc, 2);
+    _I2CWrite(pOLED,uc, 2);
   }
-  oled_x = 128; // assume 128x64
-  oled_y = 64;
+  pOLED->oled_x = 128; // assume 128x64
+  pOLED->oled_y = 64;
   if (iType == OLED_96x16)
   {
-    oled_x = 96;
-    oled_y = 16;
+    pOLED->oled_x = 96;
+    pOLED->oled_y = 16;
   }
   else if (iType == OLED_128x32)
-    oled_y = 32;
+    pOLED->oled_y = 32;
   else if (iType == OLED_128x128)
-    oled_y = 128;
+    pOLED->oled_y = 128;
   else if (iType == OLED_64x32)
   {
-    oled_x = 64;
-    oled_y = 32;
+    pOLED->oled_x = 64;
+    pOLED->oled_y = 32;
   }
   else if (iType == OLED_72x40)
   {
-    oled_x = 72;
-    oled_y = 40;
+    pOLED->oled_x = 72;
+    pOLED->oled_y = 40;
   }
   return rc;
 } /* oledInit() */
 //
 // Sends a command to turn on or off the OLED display
 //
-void oledPower(uint8_t bOn)
+void oledPower(SSOLED *pOLED, uint8_t bOn)
 {
     if (bOn)
-      oledWriteCommand(0xaf); // turn on OLED
+      oledWriteCommand(pOLED, 0xaf); // turn on OLED
     else
-      oledWriteCommand(0xae); // turn off OLED
+      oledWriteCommand(pOLED, 0xae); // turn off OLED
 } /* oledPower() */
 
 // Send a single byte command to the OLED controller
-static void oledWriteCommand(unsigned char c)
+static void oledWriteCommand(SSOLED *pOLED, unsigned char c)
 {
 unsigned char buf[2];
 
   buf[0] = 0x00; // command introducer
   buf[1] = c;
-  _I2CWrite(buf, 2);
+  _I2CWrite(pOLED, buf, 2);
 } /* oledWriteCommand() */
 
-static void oledWriteCommand2(unsigned char c, unsigned char d)
+static void oledWriteCommand2(SSOLED *pOLED, unsigned char c, unsigned char d)
 {
 unsigned char buf[3];
 
   buf[0] = 0x00;
   buf[1] = c;
   buf[2] = d;
-  _I2CWrite(buf, 3);
+  _I2CWrite(pOLED, buf, 3);
 } /* oledWriteCommand2() */
 
 //
 // Sets the brightness (0=off, 255=brightest)
 //
-void oledSetContrast(unsigned char ucContrast)
+void oledSetContrast(SSOLED *pOLED, unsigned char ucContrast)
 {
-  oledWriteCommand2(0x81, ucContrast);
+  oledWriteCommand2(pOLED, 0x81, ucContrast);
 } /* oledSetContrast() */
 //
 // Scroll the internal buffer by 1 scanline (up/down)
 // width is in pixels, lines is group of 8 rows
 //
-int oledScrollBuffer(int iStartCol, int iEndCol, int iStartRow, int iEndRow, int bUp)
+int oledScrollBuffer(SSOLED *pOLED, int iStartCol, int iEndCol, int iStartRow, int iEndRow, int bUp)
 {
     uint8_t b, *s;
     int col, row;
@@ -907,7 +913,7 @@ int oledScrollBuffer(int iStartCol, int iEndCol, int iStartRow, int iEndRow, int
     {
         for (row=iStartRow; row<=iEndRow; row++)
         {
-            s = &ucScreen[(row * 128) + iStartCol];
+            s = &pOLED->ucScreen[(row * 128) + iStartCol];
             for (col=iStartCol; col<=iEndCol; col++)
             {
                 b = *s;
@@ -922,7 +928,7 @@ int oledScrollBuffer(int iStartCol, int iEndCol, int iStartRow, int iEndRow, int
     {
         for (row=iEndRow; row>=iStartRow; row--)
         {
-            s = &ucScreen[(row * 128)+iStartCol];
+            s = &pOLED->ucScreen[(row * 128)+iStartCol];
             for (col=iStartCol; col<=iEndCol; col++)
             {
                 b = *s;
@@ -939,34 +945,34 @@ int oledScrollBuffer(int iStartCol, int iEndCol, int iStartRow, int iEndRow, int
 // Send commands to position the "cursor" (aka memory write address)
 // to the given row and column
 //
-static void oledSetPosition(int x, int y, int bRender)
+static void oledSetPosition(SSOLED *pOLED, int x, int y, int bRender)
 {
 unsigned char buf[4];
 
-  iScreenOffset = (y*128)+x;
+  pOLED->iScreenOffset = (y*128)+x;
   if (!bRender)
       return; // don't send the commands to the OLED if we're not rendering the graphics now
-  if (oled_type == OLED_64x32) // visible display starts at column 32, row 4
+  if (pOLED->oled_type == OLED_64x32) // visible display starts at column 32, row 4
   {
     x += 32; // display is centered in VRAM, so this is always true
-    if (oled_flip == 0) // non-flipped display starts from line 4
+    if (pOLED->oled_flip == 0) // non-flipped display starts from line 4
        y += 4;
   }
-  else if (oled_type == OLED_132x64) // SH1106 has 128 pixels centered in 132
+  else if (pOLED->oled_type == OLED_132x64) // SH1106 has 128 pixels centered in 132
   {
     x += 2;
   }
-  else if (oled_type == OLED_96x16) // visible display starts at line 2
+  else if (pOLED->oled_type == OLED_96x16) // visible display starts at line 2
   { // mapping is a bit strange on the 96x16 OLED
-    if (oled_flip)
+    if (pOLED->oled_flip)
       x += 32;
     else
       y += 2;
   }
-  else if (oled_type == OLED_72x40) // starts at x=28,y=3
+  else if (pOLED->oled_type == OLED_72x40) // starts at x=28,y=3
   {
     x += 28;
-    if (!oled_flip)
+    if (!pOLED->oled_flip)
     {
       y += 3;
     }
@@ -975,14 +981,14 @@ unsigned char buf[4];
   buf[1] = 0xb0 | y; // set page to Y
   buf[2] = x & 0xf; // lower column address
   buf[3] = 0x10 | (x >> 4); // upper column addr
-  _I2CWrite(buf, 4);
+  _I2CWrite(pOLED, buf, 4);
 } /* oledSetPosition() */
 
 //
 // Write a block of pixel data to the OLED
 // Length can be anything from 1 to 1024 (whole display)
 //
-static void oledWriteDataBlock(unsigned char *ucBuf, int iLen, int bRender)
+static void oledWriteDataBlock(SSOLED *pOLED, unsigned char *ucBuf, int iLen, int bRender)
 {
 unsigned char ucTemp[129];
 
@@ -992,14 +998,14 @@ unsigned char ucTemp[129];
   if (bRender)
   {
       memcpy(&ucTemp[1], ucBuf, iLen);
-      _I2CWrite(ucTemp, iLen+1);
+      _I2CWrite(pOLED, ucTemp, iLen+1);
   }
   // Keep a copy in local buffer
-  if (ucScreen)
+  if (pOLED->ucScreen)
   {
-    memcpy(&ucScreen[iScreenOffset], ucBuf, iLen);
-    iScreenOffset += iLen;
-    iScreenOffset &= ((oled_x * oled_y / 8) - 1);
+    memcpy(&pOLED->ucScreen[pOLED->iScreenOffset], ucBuf, iLen);
+    pOLED->iScreenOffset += iLen;
+    pOLED->iScreenOffset &= ((pOLED->oled_x * pOLED->oled_y / 8) - 1);
   }
 }
 //
@@ -1013,51 +1019,51 @@ unsigned char ucTemp[129];
 //
 // Write a block of flash memory to the display
 //
-void oledWriteFlashBlock(uint8_t *s, int iLen)
+void oledWriteFlashBlock(SSOLED *pOLED, uint8_t *s, int iLen)
 {
 int j;
-int iWidthMask = oled_x -1;
-int iSizeMask = ((oled_x * oled_y)/8) - 1;
-int iWidthShift = (oled_x == 128) ? 7:6; // assume 128 or 64 wide
+int iWidthMask = pOLED->oled_x -1;
+int iSizeMask = ((pOLED->oled_x * pOLED->oled_y)/8) - 1;
+int iWidthShift = (pOLED->oled_x == 128) ? 7:6; // assume 128 or 64 wide
 uint8_t ucTemp[128];
 
-     while (((iScreenOffset & iWidthMask) + iLen) >= oled_x) // if it will hit the page end
+     while (((pOLED->iScreenOffset & iWidthMask) + iLen) >= pOLED->oled_x) // if it will hit the page end
      {
-        j = oled_x - (iScreenOffset & iWidthMask); // amount we can write in one shot
+        j = pOLED->oled_x - (pOLED->iScreenOffset & iWidthMask); // amount we can write in one shot
         memcpy_P(ucTemp, s, j);
-        oledWriteDataBlock(ucTemp, j, 1);
+        oledWriteDataBlock(pOLED, ucTemp, j, 1);
         s += j;
         iLen -= j;
-        iScreenOffset = (iScreenOffset + j) & iSizeMask;
-        oledSetPosition(iScreenOffset & iWidthMask, (iScreenOffset >> iWidthShift), 1);
+        pOLED->iScreenOffset = (pOLED->iScreenOffset + j) & iSizeMask;
+        oledSetPosition(pOLED, pOLED->iScreenOffset & iWidthMask, (pOLED->iScreenOffset >> iWidthShift), 1);
      } // while it needs some help
   memcpy_P(ucTemp, s, iLen);
-  oledWriteDataBlock(ucTemp, iLen, 1);
-  iScreenOffset = (iScreenOffset + iLen) & iSizeMask;
+  oledWriteDataBlock(pOLED, ucTemp, iLen, 1);
+  pOLED->iScreenOffset = (pOLED->iScreenOffset + iLen) & iSizeMask;
 } /* oledWriteFlashBlock() */
 
 //
 // Write a repeating byte to the display
 //
-void oledRepeatByte(uint8_t b, int iLen)
+void oledRepeatByte(SSOLED *pOLED, uint8_t b, int iLen)
 {
 int j;
-int iWidthMask = oled_x -1;
-int iWidthShift = (oled_x == 128) ? 7:6; // assume 128 or 64 pixels wide
-int iSizeMask = ((oled_x * oled_y)/8) -1;
+int iWidthMask = pOLED->oled_x -1;
+int iWidthShift = (pOLED->oled_x == 128) ? 7:6; // assume 128 or 64 pixels wide
+int iSizeMask = ((pOLED->oled_x * pOLED->oled_y)/8) -1;
 uint8_t ucTemp[128];
 
      memset(ucTemp, b, (iLen > 128) ? 128:iLen);
-     while (((iScreenOffset & iWidthMask) + iLen) >= oled_x) // if it will hit the page end
+     while (((pOLED->iScreenOffset & iWidthMask) + iLen) >= pOLED->oled_x) // if it will hit the page end
      {
-        j = oled_x - (iScreenOffset & iWidthMask); // amount we can write in one shot
-        oledWriteDataBlock(ucTemp, j, 1);
+        j = pOLED->oled_x - (pOLED->iScreenOffset & iWidthMask); // amount we can write in one shot
+        oledWriteDataBlock(pOLED, ucTemp, j, 1);
         iLen -= j;
-        iScreenOffset = (iScreenOffset + j) & iSizeMask;
-        oledSetPosition(iScreenOffset & iWidthMask, (iScreenOffset >> iWidthShift), 1);
+        pOLED->iScreenOffset = (pOLED->iScreenOffset + j) & iSizeMask;
+        oledSetPosition(pOLED, pOLED->iScreenOffset & iWidthMask, (pOLED->iScreenOffset >> iWidthShift), 1);
      } // while it needs some help
-  oledWriteDataBlock(ucTemp, iLen, 1);
-  iScreenOffset += iLen;
+  oledWriteDataBlock(pOLED, ucTemp, iLen, 1);
+  pOLED->iScreenOffset += iLen;
 } /* oledRepeatByte() */
 
 //
@@ -1068,22 +1074,22 @@ uint8_t ucTemp[128];
 // Frame rate control is up to the calling program to manage
 // When it finishes the last frame, it will start again from the beginning
 //
-uint8_t * oledPlayAnimFrame(uint8_t *pAnimation, uint8_t *pCurrent, int iLen)
+uint8_t * oledPlayAnimFrame(SSOLED *pOLED, uint8_t *pAnimation, uint8_t *pCurrent, int iLen)
 {
 uint8_t *s;
 int i, j;
 unsigned char b, bCode;
-int iBufferSize = (oled_x * oled_y)/8; // size in bytes of the display devce
+int iBufferSize = (pOLED->oled_x * pOLED->oled_y)/8; // size in bytes of the display devce
 int iWidthMask, iWidthShift;
 
-  iWidthMask = oled_x - 1;
-  iWidthShift = (oled_x == 128) ? 7:6; // 128 or 64 pixels wide
+  iWidthMask = pOLED->oled_x - 1;
+  iWidthShift = (pOLED->oled_x == 128) ? 7:6; // 128 or 64 pixels wide
   if (pCurrent == NULL || pCurrent > pAnimation + iLen)
      return NULL; // invalid starting point
 
   s = (uint8_t *)pCurrent; // start of animation data
   i = 0;
-  oledSetPosition(0,0,1);
+  oledSetPosition(pOLED, 0,0,1);
   while (i < iBufferSize) // run one frame
   {
     bCode = pgm_read_byte(s++);
@@ -1094,18 +1100,18 @@ int iWidthMask, iWidthShift;
         {
            b = pgm_read_byte(s++);
            i += b + 1;
-           oledSetPosition(i & iWidthMask, (i >> iWidthShift), 1);
+           oledSetPosition(pOLED, i & iWidthMask, (i >> iWidthShift), 1);
         }
         else // skip/copy
         {
           if (bCode & 0x38)
           {
             i += ((bCode & 0x38) >> 3); // skip amount
-            oledSetPosition(i & iWidthMask, (i >> iWidthShift), 1);
+            oledSetPosition(pOLED, i & iWidthMask, (i >> iWidthShift), 1);
           }
           if (bCode & 7)
           {
-             oledWriteFlashBlock(s, bCode & 7);
+             oledWriteFlashBlock(pOLED, s, bCode & 7);
              s += (bCode & 7);
              i += bCode & 7;
           }
@@ -1116,7 +1122,7 @@ int iWidthMask, iWidthShift;
        {
          b = pgm_read_byte(s++);
          j = b + 1;
-         oledWriteFlashBlock(s, j);
+         oledWriteFlashBlock(pOLED, s, j);
          s += j;
          i += j;
        }
@@ -1125,33 +1131,33 @@ int iWidthMask, iWidthShift;
          j = ((bCode & 0x38) >> 3);
          if (j)
          {
-           oledWriteFlashBlock(s, j);
+           oledWriteFlashBlock(pOLED, s, j);
            s += j;
            i += j;
          }
          if (bCode & 7)
          {
            i += (bCode & 7); // skip
-           oledSetPosition(i & iWidthMask, (i >> iWidthShift), 1);
+           oledSetPosition(pOLED, i & iWidthMask, (i >> iWidthShift), 1);
          }
        }
        break;
      case OP_REPEATSKIP: // repeat/skip
        j = (bCode & 0x38) >> 3; // repeat count
        b = pgm_read_byte(s++);
-       oledRepeatByte(b, j);
+       oledRepeatByte(pOLED, b, j);
        i += j;
        if (bCode & 7)
        {
          i += (bCode & 7); // skip amount
-         oledSetPosition(i & iWidthMask, (i >> iWidthShift), 1);
+         oledSetPosition(pOLED, i & iWidthMask, (i >> iWidthShift), 1);
        }
        break;
                   
      case OP_REPEAT:
        j = (bCode & 0x3f) + 1;
        b = pgm_read_byte(s++);
-       oledRepeatByte(b, j);
+       oledRepeatByte(pOLED, b, j);
        i += j;
        break;  
     } // switch on code type
@@ -1168,12 +1174,12 @@ int iWidthMask, iWidthShift;
 // The priority color (0 or 1) determines which color is painted 
 // when a 1 is encountered in the source image. 
 //
-void oledDrawSprite(uint8_t *pSprite, int cx, int cy, int iPitch, int x, int y, uint8_t iPriority)
+void oledDrawSprite(SSOLED *pOLED, uint8_t *pSprite, int cx, int cy, int iPitch, int x, int y, uint8_t iPriority)
 {
     int tx, ty, dx, dy, iStartX;
     uint8_t *s, *d, uc, pix, ucSrcMask, ucDstMask;
     
-    if (x+cx < 0 || y+cy < 0 || x >= oled_x || y >= oled_y || ucScreen == NULL)
+    if (x+cx < 0 || y+cy < 0 || x >= pOLED->oled_x || y >= pOLED->oled_y || pOLED->ucScreen == NULL)
         return; // no backbuffer or out of bounds
     dy = y; // destination y
     if (y < 0) // skip the invisible parts
@@ -1183,8 +1189,8 @@ void oledDrawSprite(uint8_t *pSprite, int cx, int cy, int iPitch, int x, int y, 
         pSprite += (y * iPitch);
         dy = 0;
     }
-    if (y + cy > oled_y)
-        cy = oled_y - y;
+    if (y + cy > pOLED->oled_y)
+        cy = pOLED->oled_y - y;
     iStartX = 0;
     dx = x;
     if (x < 0)
@@ -1194,12 +1200,12 @@ void oledDrawSprite(uint8_t *pSprite, int cx, int cy, int iPitch, int x, int y, 
         iStartX = x;
         dx = 0;
     }
-    if (x + cx > oled_x)
-        cx = oled_x - x;
+    if (x + cx > pOLED->oled_x)
+        cx = pOLED->oled_x - x;
     for (ty=0; ty<cy; ty++)
     {
         s = &pSprite[iStartX >> 3];
-        d = &ucScreen[(dy>>3) * oled_x + dx];
+        d = &pOLED->ucScreen[(dy>>3) * pOLED->oled_x + dx];
         ucSrcMask = 0x80 >> (iStartX & 7);
         pix = *s++;
         ucDstMask = 1 << (dy & 7);
@@ -1247,7 +1253,7 @@ void oledDrawSprite(uint8_t *pSprite, int cx, int cy, int iPitch, int x, int y, 
 // The function can draw the tile on byte boundaries, so the x value
 // can be from 0 to 112 and y can be from 0 to 6
 //
-void oledDrawTile(const uint8_t *pTile, int x, int y, int iRotation, int bInvert, int bRender)
+void oledDrawTile(SSOLED *pOLED, const uint8_t *pTile, int x, int y, int iRotation, int bInvert, int bRender)
 {
     uint8_t ucTemp[32]; // prepare LCD data here
     uint8_t i, j, k, iOffset, ucMask, uc, ucPixels;
@@ -1320,16 +1326,16 @@ void oledDrawTile(const uint8_t *pTile, int x, int y, int iRotation, int bInvert
     }
     if (bInvert) InvertBytes(ucTemp, 32);
     // Send the data to the display
-    oledSetPosition(x, y, bRender);
-    oledWriteDataBlock(ucTemp, 16, bRender); // top half
-    oledSetPosition(x,y+1, bRender);
-    oledWriteDataBlock(&ucTemp[16], 16, bRender); // bottom half
+    oledSetPosition(pOLED, x, y, bRender);
+    oledWriteDataBlock(pOLED, ucTemp, 16, bRender); // top half
+    oledSetPosition(pOLED, x,y+1, bRender);
+    oledWriteDataBlock(pOLED, &ucTemp[16], 16, bRender); // bottom half
 } /* oledDrawTile() */
 
 // Set (or clear) an individual pixel
 // The local copy of the frame buffer is used to avoid
 // reading data from the display controller
-int oledSetPixel(int x, int y, unsigned char ucColor, int bRender)
+int oledSetPixel(SSOLED *pOLED, int x, int y, unsigned char ucColor, int bRender)
 {
 int i;
 unsigned char uc, ucOld;
@@ -1337,20 +1343,20 @@ unsigned char uc, ucOld;
   i = ((y >> 3) * 128) + x;
   if (i < 0 || i > 1023) // off the screen
     return -1;
-  oledSetPosition(x, y>>3, bRender);
+  oledSetPosition(pOLED, x, y>>3, bRender);
 
-  if (ucScreen)
-    uc = ucOld = ucScreen[i];
-  else if (oled_type == OLED_132x64 || oled_type == OLED_128x128) // SH1106/SH1107 can read data
+  if (pOLED->ucScreen)
+    uc = ucOld = pOLED->ucScreen[i];
+  else if (pOLED->oled_type == OLED_132x64 || pOLED->oled_type == OLED_128x128) // SH1106/SH1107 can read data
   {
     uint8_t ucTemp[3];
      ucTemp[0] = 0x80; // one command
      ucTemp[1] = 0xE0; // read_modify_write
      ucTemp[2] = 0xC0; // one data
-     _I2CWrite(ucTemp, 3);
+     _I2CWrite(pOLED, ucTemp, 3);
 
      // read a dummy byte followed by the data byte we want
-     I2CRead(oled_addr, ucTemp, 2);
+     I2CRead(&pOLED->bbi2c, pOLED->oled_addr, ucTemp, 2);
      uc = ucOld = ucTemp[1]; // first byte is garbage 
   }
   else
@@ -1364,19 +1370,19 @@ unsigned char uc, ucOld;
   if (uc != ucOld) // pixel changed
   {
 //    oledSetPosition(x, y>>3);
-    if (ucScreen)
+    if (pOLED->ucScreen)
     {
-      oledWriteDataBlock(&uc, 1, bRender);
-      ucScreen[i] = uc;
+      oledWriteDataBlock(pOLED, &uc, 1, bRender);
+      pOLED->ucScreen[i] = uc;
     }
-    else if (oled_type == OLED_132x64 || oled_type == OLED_128x128) // end the read_modify_write operation
+    else if (pOLED->oled_type == OLED_132x64 || pOLED->oled_type == OLED_128x128) // end the read_modify_write operation
     {
       uint8_t ucTemp[4];
       ucTemp[0] = 0xc0; // one data
       ucTemp[1] = uc;   // actual data
       ucTemp[2] = 0x80; // one command
       ucTemp[3] = 0xEE; // end read_modify_write operation
-      _I2CWrite(ucTemp, 4);
+      _I2CWrite(pOLED, ucTemp, 4);
     }
   }
   return 0;
@@ -1400,7 +1406,7 @@ uint8_t i;
 // Pass the pointer to the beginning of the BMP file
 // First pass version assumes a full screen bitmap
 //
-int oledLoadBMP(uint8_t *pBMP, int bInvert, int bRender)
+int oledLoadBMP(SSOLED *pOLED, uint8_t *pBMP, int bInvert, int bRender)
 {
 int16_t i16;
 int iOffBits, q, y, j; // offset to bitmap data
@@ -1435,7 +1441,7 @@ uint8_t bFlipped = false;
 // rotate the data and send it to the display
   for (y=0; y<8; y++) // 8 lines of 8 pixels
   {
-     oledSetPosition(0, y, bRender);
+     oledSetPosition(pOLED, 0, y, bRender);
      for (j=0; j<8; j++) // do 8 sections of 16 columns
      {
          s = &pBMP[iOffBits + (j*2) + (y * iPitch*8)]; // source line
@@ -1457,7 +1463,7 @@ uint8_t bFlipped = false;
             s++; // next source byte
          } // for x
          if (bInvert) InvertBytes(ucTemp, 16);
-         oledWriteDataBlock(ucTemp, 16, bRender);
+         oledWriteDataBlock(pOLED, ucTemp, 16, bRender);
      } // for j
   } // for y
   return 0;
@@ -1467,43 +1473,44 @@ uint8_t bFlipped = false;
 // The column represents the pixel column (0-127)
 // The row represents the text row (0-7)
 //
-void oledSetCursor(int x, int y)
+void oledSetCursor(SSOLED *pOLED, int x, int y)
 {
-  iCursorX = x; iCursorY = y;
+  pOLED->iCursorX = x;
+  pOLED->iCursorY = y;
 } /* oledSetCursor() */
 //
 // Turn text wrap on or off for the oldWriteString() function
 //
-void oledSetTextWrap(int bWrap)
+void oledSetTextWrap(SSOLED *pOLED, int bWrap)
 {
-  oled_wrap = bWrap;
+  pOLED->oled_wrap = bWrap;
 } /* oledSetTextWrap() */
 //
 // Draw a string of normal (8x8), small (6x8) or large (16x32) characters
 // At the given col+row
 //
-int oledWriteString(int iScroll, int x, int y, char *szMsg, int iSize, int bInvert, int bRender)
+int oledWriteString(SSOLED *pOLED, int iScroll, int x, int y, char *szMsg, int iSize, int bInvert, int bRender)
 {
 int i, iFontOff, iLen, iFontSkip;
 unsigned char c, *s, ucTemp[40];
 
     if (x == -1 || y == -1) // use the cursor position
     {
-      x = iCursorX; y = iCursorY;
+      x = pOLED->iCursorX; y = pOLED->iCursorY;
     }
     else
     {
-      iCursorX = x; iCursorY = y; // set the new cursor position
+      pOLED->iCursorX = x; pOLED->iCursorY = y; // set the new cursor position
     }
-    if (iCursorX >= oled_x || iCursorY >= oled_y / 8)
+    if (pOLED->iCursorX >= pOLED->oled_x || pOLED->iCursorY >= pOLED->oled_y / 8)
        return -1; // can't draw off the display
 
-    oledSetPosition(iCursorX, iCursorY, bRender);
+    oledSetPosition(pOLED, pOLED->iCursorX, pOLED->iCursorY, bRender);
     if (iSize == FONT_NORMAL) // 8x8 font
     {
        i = 0;
        iFontSkip = iScroll & 7; // number of columns to initially skip
-       while (iCursorX < oled_x && szMsg[i] != 0 && iCursorY < oled_y / 8)
+       while (pOLED->iCursorX < pOLED->oled_x && szMsg[i] != 0 && pOLED->iCursorY < pOLED->oled_y / 8)
        {
          if (iScroll < 8) // only display visible characters
          {
@@ -1514,15 +1521,15 @@ unsigned char c, *s, ucTemp[40];
              if (bInvert) InvertBytes(ucTemp, 8);
     //         oledCachedWrite(ucTemp, 8);
              iLen = 8 - iFontSkip;
-             if (iCursorX + iLen > oled_x) // clip right edge
-                 iLen = oled_x - iCursorX;
-             oledWriteDataBlock(&ucTemp[iFontSkip], iLen, bRender); // write character pattern
-             iCursorX += iLen;
-             if (iCursorX >= oled_x && oled_wrap) // word wrap enabled?
+             if (pOLED->iCursorX + iLen > pOLED->oled_x) // clip right edge
+                 iLen = pOLED->oled_x - pOLED->iCursorX;
+             oledWriteDataBlock(pOLED, &ucTemp[iFontSkip], iLen, bRender); // write character pattern
+             pOLED->iCursorX += iLen;
+             if (pOLED->iCursorX >= pOLED->oled_x && pOLED->oled_wrap) // word wrap enabled?
              {
-               iCursorX = 0; // start at the beginning of the next line
-               iCursorY++;
-               oledSetPosition(iCursorX, iCursorY, bRender);
+               pOLED->iCursorX = 0; // start at the beginning of the next line
+               pOLED->iCursorY++;
+               oledSetPosition(pOLED, pOLED->iCursorX, pOLED->iCursorY, bRender);
              }
              iFontSkip = 0;
          }
@@ -1537,42 +1544,42 @@ unsigned char c, *s, ucTemp[40];
     {
       i = 0;
       iFontSkip = iScroll & 15; // number of columns to initially skip
-      while (iCursorX < oled_x && iCursorY < (oled_y / 8)-3 && szMsg[i] != 0)
+      while (pOLED->iCursorX < pOLED->oled_x && pOLED->iCursorY < (pOLED->oled_y / 8)-3 && szMsg[i] != 0)
       {
           if (iScroll < 16) // if characters are visible
           {
               s = (unsigned char *)&ucBigFont[(unsigned char)(szMsg[i]-32)*64];
               iLen = 16 - iFontSkip;
-              if (iCursorX + iLen > oled_x) // clip right edge
-                  iLen = oled_x - iCursorX;
+              if (pOLED->iCursorX + iLen > pOLED->oled_x) // clip right edge
+                  iLen = pOLED->oled_x - pOLED->iCursorX;
               // we can't directly use the pointer to FLASH memory, so copy to a local buffer
-              oledSetPosition(iCursorX, iCursorY, bRender);
+              oledSetPosition(pOLED, pOLED->iCursorX, pOLED->iCursorY, bRender);
               memcpy_P(ucTemp, s, 16);
               if (bInvert) InvertBytes(ucTemp, 16);
-              oledWriteDataBlock(&ucTemp[iFontSkip], iLen, bRender); // write character pattern
-              oledSetPosition(iCursorX, iCursorY+1, bRender);
+              oledWriteDataBlock(pOLED, &ucTemp[iFontSkip], iLen, bRender); // write character pattern
+              oledSetPosition(pOLED, pOLED->iCursorX, pOLED->iCursorY+1, bRender);
               memcpy_P(ucTemp, s+16, 16);
               if (bInvert) InvertBytes(ucTemp, 16);
-              oledWriteDataBlock(&ucTemp[iFontSkip], iLen, bRender); // write character pattern
-              if (iCursorY <= 5)
+              oledWriteDataBlock(pOLED, &ucTemp[iFontSkip], iLen, bRender); // write character pattern
+              if (pOLED->iCursorY <= 5)
               {
-                 oledSetPosition(iCursorX, iCursorY+2, bRender);
+                 oledSetPosition(pOLED, pOLED->iCursorX, pOLED->iCursorY+2, bRender);
                  memcpy_P(ucTemp, s+32, 16);
                  if (bInvert) InvertBytes(ucTemp, 16);
-                 oledWriteDataBlock(&ucTemp[iFontSkip], iLen, bRender); // write character pattern
+                 oledWriteDataBlock(pOLED, &ucTemp[iFontSkip], iLen, bRender); // write character pattern
               }
-              if (iCursorY <= 4)
+              if (pOLED->iCursorY <= 4)
               {
-                 oledSetPosition(iCursorX, iCursorY+3, bRender);
+                 oledSetPosition(pOLED, pOLED->iCursorX, pOLED->iCursorY+3, bRender);
                  memcpy_P(ucTemp, s+48, 16);
                  if (bInvert) InvertBytes(ucTemp, 16);
-                 oledWriteDataBlock(&ucTemp[iFontSkip], iLen, bRender); // write character pattern
+                 oledWriteDataBlock(pOLED, &ucTemp[iFontSkip], iLen, bRender); // write character pattern
               }
-              iCursorX += iLen;
-              if (iCursorX >= oled_x && oled_wrap) // word wrap enabled?
+              pOLED->iCursorX += iLen;
+              if (pOLED->iCursorX >= pOLED->oled_x && pOLED->oled_wrap) // word wrap enabled?
               {
-                iCursorX = 0; // start at the beginning of the next line
-                iCursorY+=4;
+                pOLED->iCursorX = 0; // start at the beginning of the next line
+                pOLED->iCursorY+=4;
               }
               iFontSkip = 0;
           } // if character visible from scrolling
@@ -1586,7 +1593,7 @@ unsigned char c, *s, ucTemp[40];
     {
       i = 0;
       iFontSkip = iScroll & 15; // number of columns to initially skip
-      while (iCursorX < oled_x && iCursorY < (oled_y/8)-1 && szMsg[i] != 0)
+      while (pOLED->iCursorX < pOLED->oled_x && pOLED->iCursorY < (pOLED->oled_y/8)-1 && szMsg[i] != 0)
       {   
 // stretch the 'normal' font instead of using the big font
           if (iScroll < 16) // if characters are visible
@@ -1620,18 +1627,18 @@ unsigned char c, *s, ucTemp[40];
                   pDest[17] = uc2;
               }
               iLen = 16 - iFontSkip;
-              if (iCursorX + iLen > oled_x) // clip right edge
-                  iLen = oled_x - iCursorX;
-              oledSetPosition(iCursorX, iCursorY, bRender);
-              oledWriteDataBlock(&ucTemp[8+iFontSkip], iLen, bRender);
-              oledSetPosition(iCursorX, iCursorY+1, bRender);
-              oledWriteDataBlock(&ucTemp[24+iFontSkip], iLen, bRender);
-              iCursorX += iLen;
-              if (iCursorX >= oled_x && oled_wrap) // word wrap enabled?
+              if (pOLED->iCursorX + iLen > pOLED->oled_x) // clip right edge
+                  iLen = pOLED->oled_x - pOLED->iCursorX;
+              oledSetPosition(pOLED, pOLED->iCursorX, pOLED->iCursorY, bRender);
+              oledWriteDataBlock(pOLED, &ucTemp[8+iFontSkip], iLen, bRender);
+              oledSetPosition(pOLED, pOLED->iCursorX, pOLED->iCursorY+1, bRender);
+              oledWriteDataBlock(pOLED, &ucTemp[24+iFontSkip], iLen, bRender);
+              pOLED->iCursorX += iLen;
+              if (pOLED->iCursorX >= pOLED->oled_x && pOLED->oled_wrap) // word wrap enabled?
               {
-                iCursorX = 0; // start at the beginning of the next line
-                iCursorY += 2;
-                oledSetPosition(iCursorX, iCursorY, bRender);
+                pOLED->iCursorX = 0; // start at the beginning of the next line
+                pOLED->iCursorY += 2;
+                oledSetPosition(pOLED, pOLED->iCursorX, pOLED->iCursorY, bRender);
               }
               iFontSkip = 0;
           } // if characters are visible
@@ -1644,7 +1651,7 @@ unsigned char c, *s, ucTemp[40];
     {
        i = 0;
        iFontSkip = iScroll % 6;
-       while (iCursorX < oled_x && iCursorY < (oled_y/8) && szMsg[i] != 0)
+       while (pOLED->iCursorX < pOLED->oled_x && pOLED->iCursorY < (pOLED->oled_y/8) && szMsg[i] != 0)
        {
            if (iScroll < 6) // if characters are visible
            {
@@ -1653,17 +1660,17 @@ unsigned char c, *s, ucTemp[40];
                memcpy_P(ucTemp, &ucSmallFont[(int)c*6], 6);
                if (bInvert) InvertBytes(ucTemp, 6);
                iLen = 6 - iFontSkip;
-               if (iCursorX + iLen > oled_x) // clip right edge
-                   iLen = oled_x - iCursorX;
-               oledWriteDataBlock(&ucTemp[iFontSkip], iLen, bRender); // write character pattern
+               if (pOLED->iCursorX + iLen > pOLED->oled_x) // clip right edge
+                   iLen = pOLED->oled_x - pOLED->iCursorX;
+               oledWriteDataBlock(pOLED, &ucTemp[iFontSkip], iLen, bRender); // write character pattern
     //         oledCachedWrite(ucTemp, 6);
-               iCursorX += iLen;
+               pOLED->iCursorX += iLen;
                iFontSkip = 0;
-               if (iCursorX >= oled_x && oled_wrap) // word wrap enabled?
+               if (pOLED->iCursorX >= pOLED->oled_x && pOLED->oled_wrap) // word wrap enabled?
                {
-                 iCursorX = 0; // start at the beginning of the next line
-                 iCursorY++;
-                 oledSetPosition(iCursorX, iCursorY, bRender);
+                 pOLED->iCursorX = 0; // start at the beginning of the next line
+                 pOLED->iCursorY++;
+                 oledSetPosition(pOLED, pOLED->iCursorX, pOLED->iCursorY, bRender);
                }
            } // if characters are visible
          iScroll -= 6;
@@ -1681,18 +1688,18 @@ unsigned char c, *s, ucTemp[40];
 // layout of OLEDs.
 // returns 0 for success, -1 for invalid parameter
 //
-int oledDrawGFX(uint8_t *pBuffer, int iSrcCol, int iSrcRow, int iDestCol, int iDestRow, int iWidth, int iHeight, int iSrcPitch)
+int oledDrawGFX(SSOLED *pOLED, uint8_t *pBuffer, int iSrcCol, int iSrcRow, int iDestCol, int iDestRow, int iWidth, int iHeight, int iSrcPitch)
 {
     int y;
     
-    if (iSrcCol < 0 || iSrcCol > 127 || iSrcRow < 0 || iSrcRow > 7 || iDestCol < 0 || iDestCol >= oled_x || iDestRow < 0 || iDestRow >= (oled_y >> 3) || iSrcPitch <= 0)
+    if (iSrcCol < 0 || iSrcCol > 127 || iSrcRow < 0 || iSrcRow > 7 || iDestCol < 0 || iDestCol >= pOLED->oled_x || iDestRow < 0 || iDestRow >= (pOLED->oled_y >> 3) || iSrcPitch <= 0)
         return -1; // invalid
     
     for (y=iSrcRow; y<iSrcRow+iHeight; y++)
     {
         uint8_t *s = &pBuffer[(y * iSrcPitch)+iSrcCol];
-        oledSetPosition(iDestCol, iDestRow, 1);
-        oledWriteDataBlock(s, iWidth, 1);
+        oledSetPosition(pOLED, iDestCol, iDestRow, 1);
+        oledWriteDataBlock(pOLED, s, iWidth, 1);
         pBuffer += iSrcPitch;
         iDestRow++;
     } // for y
@@ -1702,33 +1709,33 @@ int oledDrawGFX(uint8_t *pBuffer, int iSrcCol, int iSrcRow, int iDestCol, int iD
 // Dump a screen's worth of data directly to the display
 // Try to speed it up by comparing the new bytes with the existing buffer
 //
-void oledDumpBuffer(uint8_t *pBuffer)
+void oledDumpBuffer(SSOLED *pOLED, uint8_t *pBuffer)
 {
 int x, y;
 int iLines, iCols;
 uint8_t bNeedPos;
-uint8_t *pSrc = ucScreen;
+uint8_t *pSrc = pOLED->ucScreen;
     
   if (pBuffer == NULL) // dump the internal buffer if none is given
-    pBuffer = ucScreen;
+    pBuffer = pOLED->ucScreen;
   if (pBuffer == NULL)
     return; // no backbuffer and no provided buffer
   
-  iLines = oled_y >> 3;
-  iCols = oled_x >> 4;
+  iLines = pOLED->oled_y >> 3;
+  iCols = pOLED->oled_x >> 4;
   for (y=0; y<iLines; y++)
   {
     bNeedPos = 1; // start of a new line means we need to set the position too
     for (x=0; x<iCols; x++) // wiring library has a 32-byte buffer, so send 16 bytes so that the data prefix (0x40) can fit
     {
-      if (ucScreen == NULL || pBuffer == pSrc || memcmp(pSrc, pBuffer, 16) != 0) // doesn't match, need to send it
+      if (pOLED->ucScreen == NULL || pBuffer == pSrc || memcmp(pSrc, pBuffer, 16) != 0) // doesn't match, need to send it
       {
         if (bNeedPos) // need to reposition output cursor?
         {
            bNeedPos = 0;
-           oledSetPosition(x*16, y, 1);
+           oledSetPosition(pOLED, x*16, y, 1);
         }
-        oledWriteDataBlock(pBuffer, 16, 1);
+        oledWriteDataBlock(pOLED, pBuffer, 16, 1);
       }
       else
       {
@@ -1737,38 +1744,38 @@ uint8_t *pSrc = ucScreen;
       pSrc += 16;
       pBuffer += 16;
     } // for x
-    pSrc += (128 - oled_x); // for narrow displays, skip to the next line
-    pBuffer += (128 - oled_x);
+    pSrc += (128 - pOLED->oled_x); // for narrow displays, skip to the next line
+    pBuffer += (128 - pOLED->oled_x);
   } // for y
 } /* oledDumpBuffer() */
 //
 // Fill the frame buffer with a byte pattern
 // e.g. all off (0x00) or all on (0xff)
 //
-void oledFill(unsigned char ucData, int bRender)
+void oledFill(SSOLED *pOLED, unsigned char ucData, int bRender)
 {
 uint8_t x, y;
 uint8_t iLines, iCols;
 unsigned char temp[16];
 
-  iLines = oled_y >> 3;
-  iCols = oled_x >> 4;
+  iLines = pOLED->oled_y >> 3;
+  iCols = pOLED->oled_x >> 4;
   memset(temp, ucData, 16);
-  iCursorX = iCursorY = 0;
+  pOLED->iCursorX = pOLED->iCursorY = 0;
  
   for (y=0; y<iLines; y++)
   {
-    oledSetPosition(0,y, bRender); // set to (0,Y)
+    oledSetPosition(pOLED, 0,y, bRender); // set to (0,Y)
     for (x=0; x<iCols; x++) // wiring library has a 32-byte buffer, so send 16 bytes so that the data prefix (0x40) can fit
     {
-      oledWriteDataBlock(temp, 16, bRender);
+      oledWriteDataBlock(pOLED, temp, 16, bRender);
     } // for x
     // 72 isn't evenly divisible by 16, so fix it
-    if (oled_type == OLED_72x40)
-       oledWriteDataBlock(temp, 8, bRender);
+    if (pOLED->oled_type == OLED_72x40)
+       oledWriteDataBlock(pOLED, temp, 8, bRender);
   } // for y
-  if (ucScreen)
-    memset(ucScreen, ucData, (oled_x * oled_y)/8);
+  if (pOLED->ucScreen)
+    memset(pOLED->ucScreen, ucData, (pOLED->oled_x * pOLED->oled_y)/8);
 } /* oledFill() */
 
 //
@@ -1778,12 +1785,12 @@ unsigned char temp[16];
 // Pass NULL to revoke the buffer. Make sure you provide a buffer
 // large enough for your display (e.g. 128x64 needs 1K - 1024 bytes)
 //
-void oledSetBackBuffer(uint8_t *pBuffer)
+void oledSetBackBuffer(SSOLED *pOLED, uint8_t *pBuffer)
 {
-  ucScreen = pBuffer;
+  pOLED->ucScreen = pBuffer;
 } /* oledSetBackBuffer() */
 
-void oledDrawLine(int x1, int y1, int x2, int y2, int bRender)
+void oledDrawLine(SSOLED *pOLED, int x1, int y1, int x2, int y2, int bRender)
 {
   int temp;
   int dx = x2 - x1;
@@ -1793,7 +1800,7 @@ void oledDrawLine(int x1, int y1, int x2, int y2, int bRender)
   int xinc, yinc;
   int y, x;
   
-  if (x1 < 0 || x2 < 0 || y1 < 0 || y2 < 0 || x1 > 127 || x2 > 127 || y1 > 63 || y2 > 63)
+  if (x1 < 0 || x2 < 0 || y1 < 0 || y2 < 0 || x1 >= pOLED->oled_x || x2 >= pOLED->oled_x || y1 >= pOLED->oled_y || y2 >= pOLED->oled_y)
      return;
 
   if(abs(dx) > abs(dy)) {
@@ -1817,7 +1824,7 @@ void oledDrawLine(int x1, int y1, int x2, int y2, int bRender)
       dy = -dy;
       yinc = -1;
     }
-    p = pStart = &ucScreen[x1 + ((y >> 3) << 7)]; // point to current spot in back buffer
+    p = pStart = &pOLED->ucScreen[x1 + ((y >> 3) << 7)]; // point to current spot in back buffer
     mask = 1 << (y & 7); // current bit offset
     for(x=x1; x1 <= x2; x1++) {
       *p++ |= mask; // set pixel and increment x pointer
@@ -1831,8 +1838,8 @@ void oledDrawLine(int x1, int y1, int x2, int y2, int bRender)
            mask >>= 1;
         if (mask == 0) // we've moved outside the current row, write the data we changed
         {
-           oledSetPosition(x, y>>3, bRender);
-           oledWriteDataBlock(pStart,  (int)(p-pStart), bRender); // write the row we changed
+           oledSetPosition(pOLED, x, y>>3, bRender);
+           oledWriteDataBlock(pOLED, pStart,  (int)(p-pStart), bRender); // write the row we changed
            x = x1+1; // we've already written the byte at x1
            y1 = y+yinc;
            p += (yinc > 0) ? 128 : -128;
@@ -1844,8 +1851,8 @@ void oledDrawLine(int x1, int y1, int x2, int y2, int bRender)
     } // for x1    
    if (p != pStart) // some data needs to be written
    {
-     oledSetPosition(x, y>>3, bRender);
-     oledWriteDataBlock(pStart, (int)(p-pStart), bRender);
+     oledSetPosition(pOLED, x, y>>3, bRender);
+     oledWriteDataBlock(pOLED, pStart, (int)(p-pStart), bRender);
    }
   }
   else {
@@ -1860,7 +1867,7 @@ void oledDrawLine(int x1, int y1, int x2, int y2, int bRender)
       y2 = temp;
     } 
 
-    p = &ucScreen[x1 + ((y1 >> 3) * 128)]; // point to current spot in back buffer
+    p = &pOLED->ucScreen[x1 + ((y1 >> 3) * 128)]; // point to current spot in back buffer
     bOld = bNew = p[0]; // current data at that address
     mask = 1 << (y1 & 7); // current bit offset
     dx = (x2 - x1);
@@ -1880,8 +1887,8 @@ void oledDrawLine(int x1, int y1, int x2, int y2, int bRender)
         if (bOld != bNew)
         {
           p[0] = bNew; // save to RAM
-          oledSetPosition(x, y1>>3, bRender);
-          oledWriteDataBlock(&bNew, 1, bRender);
+          oledSetPosition(pOLED, x, y1>>3, bRender);
+          oledWriteDataBlock(pOLED, &bNew, 1, bRender);
         }
         p += 128; // next line
         bOld = bNew = p[0];
@@ -1893,8 +1900,8 @@ void oledDrawLine(int x1, int y1, int x2, int y2, int bRender)
         if (bOld != bNew) // write the last byte we modified if it changed
         {
           p[0] = bNew; // save to RAM
-          oledSetPosition(x, y1>>3, bRender);
-          oledWriteDataBlock(&bNew, 1, bRender);
+          oledSetPosition(pOLED, x, y1>>3, bRender);
+          oledWriteDataBlock(pOLED, &bNew, 1, bRender);
         }
         p += xinc;
         x += xinc;
@@ -1904,8 +1911,8 @@ void oledDrawLine(int x1, int y1, int x2, int y2, int bRender)
     if (bOld != bNew) // write the last byte we modified if it changed
     {
       p[0] = bNew; // save to RAM
-      oledSetPosition(x, y2>>3, bRender);
-      oledWriteDataBlock(&bNew, 1, bRender);
+      oledSetPosition(pOLED, x, y2>>3, bRender);
+      oledWriteDataBlock(pOLED, &bNew, 1, bRender);
     }
   } // y major case
 } /* oledDrawLine() */
