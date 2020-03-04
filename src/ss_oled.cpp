@@ -999,7 +999,7 @@ unsigned char ucTemp[129];
   {
     memcpy(&ucScreen[iScreenOffset], ucBuf, iLen);
     iScreenOffset += iLen;
-    iScreenOffset &= ((oled_x * oled_y / 8) - 1);
+    iScreenOffset &= 1023; // we use a fixed stride of 128 no matter what the display size
   }
 }
 //
