@@ -1,4 +1,5 @@
 ss_oled (Small Simple OLED library)<br>
+-----------------------------------
 Project started 1/15/2017<br>
 Copyright (c) 2017 BitBank Software, Inc.<br>
 Written by Larry Bank<br>
