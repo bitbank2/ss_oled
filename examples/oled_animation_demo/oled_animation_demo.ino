@@ -10,10 +10,25 @@
 // or just the pin numbers on other MCUs
 // My demo was run on an Arduino Pro Mini (ATmega328) with SDA connected to D8 and SCL to D9
 // These translate to PORT B, bit 0 (0xB0) and PORT B, bit 1 (0xB1)
-#define SDA_PIN 0xb0
-#define SCL_PIN 0xb1
-// Only define this if your display needs to be explicity reset (some 2.42" OLEDs do
+//#define SDA_PIN 0xb0
+//#define SCL_PIN 0xb1
+
+// These pin numbers are for the M5Stack Atom
+#define SDA_PIN 21
+#define SCL_PIN 22
+// Set this to -1 to disable or the GPIO pin number connected to the reset
+// line of your display if it requires an external reset
 #define RESET_PIN -1
+// let ss_oled figure out the display address
+#define OLED_ADDR -1
+// don't rotate the display
+#define FLIP180 0
+// don't invert the display
+#define INVERT 0
+// Bit-Bang the I2C bus
+// Set this to 1 to use the wire library
+#define USE_HW_I2C 0
+
 // Most people have the 0.96" 128x64 SSD1306 OLED display
 // Leave this line alone if you do. 
 // For the Pimoroni 128x128, comment out this line (or delete it)
@@ -523,9 +538,11 @@ const byte bAnimation[] PROGMEM = {
 };
 #endif
 
+SSOLED ssoled; // single display structure
+
 void setup() {
 int rc;
-  rc = oledInit(OLED_TYPE, 0, 0, SDA_PIN, SCL_PIN, RESET_PIN, 400000L);
+  rc = oledInit(&ssoled, OLED_TYPE, OLED_ADDR, FLIP180, INVERT, USE_HW_I2C, SDA_PIN, SCL_PIN, RESET_PIN, 400000L);
 } /* setup() */
 
 void loop() {
@@ -533,7 +550,7 @@ uint8_t *pAnim = (uint8_t *)bAnimation; // point to first frame
 
   while (1)
   { // play all frames (automatically starts over when it reaches the end)
-    pAnim = oledPlayAnimFrame((uint8_t *)bAnimation, pAnim, sizeof(bAnimation));
+    pAnim = oledPlayAnimFrame(&ssoled, (uint8_t *)bAnimation, pAnim, sizeof(bAnimation));
     delay(20); // simplistic rate control; should manage the variable time per frame
   }
 } /* loop() */

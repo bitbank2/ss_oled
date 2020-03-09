@@ -1,6 +1,6 @@
 ss_oled (Small Simple OLED library)<br>
 Project started 1/15/2017<br>
-Copyright (c) 2017-2019 BitBank Software, Inc.<br>
+Copyright (c) 2017 BitBank Software, Inc.<br>
 Written by Larry Bank<br>
 bitbank@pobox.com<br>
 <br>
@@ -13,8 +13,7 @@ I2C bus. On AVR microcontrollers, there is an optimized option to speed up
 access to the GPIO pins to allow speeds which match or exceed normal I2C
 speeds. The pins are numbered with the Port letter as the first digit followed
 by the bit number. For example, To use bit 0 of Port B, you would reference
-pin number 0xb0. Includes the unique feature that the init function automatically
-detects the display address (0x3C or 0x3D) and the controller type (SSD1306, SH1106 or
+pin number 0xb0. Includes the unique feature that the init function can optionally detect the display address (0x3C or 0x3D) and the controller type (SSD1306, SH1106 or
 SH1107).<br>
 I try to support as many OLEDs as I can. I was able to justify buying a bunch
 of different sized SSD1306 displays because they're around $2 each. A generous patron
@@ -24,7 +23,8 @@ It uses the SH1107 controller and behaves very similarly to the SH1106.
 
 Features:<br>
 ---------<br>
-- Automatically detects the display address and type (I2C only)<br>
+- Supports any number of simultaneous displays of any type (mix and match)<br>
+- Optionally detect the display address and type (I2C only)<br>
 - Supports 72x40, 96x16, 64x32, 128x32, 128x64, 128x128 (SH1107) and 132x64 (SH1106) display sizes<br>
 - Drive displays from I2C, SPI or any 2 GPIO pins (virtual I2C)<br>
 - 4 sizes of fixed fonts (6x8, 8x8, 16x16, 16x32)<br>

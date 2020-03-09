@@ -768,7 +768,7 @@ int rc = OLED_NOT_FOUND;
   pOLED->oled_addr = (uint8_t)scl;
 #else
   // find the device address if requested
-  if (iAddr == 0 || iAddr == 0xff) // find it
+  if (iAddr == -1 || iAddr == 0 || iAddr == 0xff) // find it
   {
     I2CTest(&pOLED->bbi2c, 0x3c);
     if (I2CTest(&pOLED->bbi2c, 0x3c))
@@ -1003,9 +1003,9 @@ unsigned char ucTemp[129];
   // Keep a copy in local buffer
   if (pOLED->ucScreen)
   {
-    memcpy(&ucScreen[iScreenOffset], ucBuf, iLen);
-    iScreenOffset += iLen;
-    iScreenOffset &= 1023; // we use a fixed stride of 128 no matter what the display size
+    memcpy(&pOLED->ucScreen[pOLED->iScreenOffset], ucBuf, iLen);
+    pOLED->iScreenOffset += iLen;
+    pOLED->iScreenOffset &= 1023; // we use a fixed stride of 128 no matter what the display size
   }
 }
 //
