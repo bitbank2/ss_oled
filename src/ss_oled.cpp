@@ -1525,7 +1525,7 @@ unsigned char c, *s, ucTemp[40];
                  iLen = pOLED->oled_x - pOLED->iCursorX;
              oledWriteDataBlock(pOLED, &ucTemp[iFontSkip], iLen, bRender); // write character pattern
              pOLED->iCursorX += iLen;
-             if (pOLED->iCursorX >= pOLED->oled_x && pOLED->oled_wrap) // word wrap enabled?
+             if (pOLED->iCursorX >= pOLED->oled_x-7 && pOLED->oled_wrap) // word wrap enabled?
              {
                pOLED->iCursorX = 0; // start at the beginning of the next line
                pOLED->iCursorY++;
@@ -1576,7 +1576,7 @@ unsigned char c, *s, ucTemp[40];
                  oledWriteDataBlock(pOLED, &ucTemp[iFontSkip], iLen, bRender); // write character pattern
               }
               pOLED->iCursorX += iLen;
-              if (pOLED->iCursorX >= pOLED->oled_x && pOLED->oled_wrap) // word wrap enabled?
+              if (pOLED->iCursorX >= pOLED->oled_x-15 && pOLED->oled_wrap) // word wrap enabled?
               {
                 pOLED->iCursorX = 0; // start at the beginning of the next line
                 pOLED->iCursorY+=4;
@@ -1634,7 +1634,7 @@ unsigned char c, *s, ucTemp[40];
               oledSetPosition(pOLED, pOLED->iCursorX, pOLED->iCursorY+1, bRender);
               oledWriteDataBlock(pOLED, &ucTemp[24+iFontSkip], iLen, bRender);
               pOLED->iCursorX += iLen;
-              if (pOLED->iCursorX >= pOLED->oled_x && pOLED->oled_wrap) // word wrap enabled?
+              if (pOLED->iCursorX >= pOLED->oled_x-15 && pOLED->oled_wrap) // word wrap enabled?
               {
                 pOLED->iCursorX = 0; // start at the beginning of the next line
                 pOLED->iCursorY += 2;
@@ -1666,7 +1666,7 @@ unsigned char c, *s, ucTemp[40];
     //         oledCachedWrite(ucTemp, 6);
                pOLED->iCursorX += iLen;
                iFontSkip = 0;
-               if (pOLED->iCursorX >= pOLED->oled_x && pOLED->oled_wrap) // word wrap enabled?
+               if (pOLED->iCursorX >= pOLED->oled_x-5 && pOLED->oled_wrap) // word wrap enabled?
                {
                  pOLED->iCursorX = 0; // start at the beginning of the next line
                  pOLED->iCursorY++;
