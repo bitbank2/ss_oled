@@ -193,6 +193,14 @@ void oledDrawSprite(SSOLED *pOLED, uint8_t *pSprite, int cx, int cy, int iPitch,
 // can be from 0 to 112 and y can be from 0 to 6
 //
 void oledDrawTile(SSOLED *pOLED, const uint8_t *pTile, int x, int y, int iRotation, int bInvert, int bRender);
+//
+// Draw an outline or filled ellipse
+//
+void oledEllipse(SSOLED *pOLED, int iCenterX, int iCenterY, int32_t iRadiusX, int32_t iRadiusY, uint8_t ucColor, uint8_t bFilled);
+//
+// Draw an outline or filled rectangle
+//
+void oledRectangle(SSOLED *pOLED, int x1, int y1, int x2, int y2, uint8_t ucColor, uint8_t bFilled);
 
 #if defined(_LINUX_) && defined(__cplusplus)
 }

@@ -1917,3 +1917,257 @@ void oledDrawLine(SSOLED *pOLED, int x1, int y1, int x2, int y2, int bRender)
   } // y major case
 } /* oledDrawLine() */
 
+//
+// For drawing ellipses, a circle is drawn and the x and y pixels are scaled by a 16-bit integer fraction
+// This function draws a single pixel and scales its position based on the x/y fraction of the ellipse
+//
+static void DrawScaledPixel(SSOLED *pOLED, int iCX, int iCY, int x, int y, int32_t iXFrac, int32_t iYFrac, uint8_t ucColor)
+{
+    uint8_t *d, ucMask;
+    
+    if (iXFrac != 0x10000) x = ((x * iXFrac) >> 16);
+    if (iYFrac != 0x10000) y = ((y * iYFrac) >> 16);
+    x += iCX; y += iCY;
+    if (x < 0 || x >= pOLED->oled_x || y < 0 || y >= pOLED->oled_y)
+        return; // off the screen
+    d = &pOLED->ucScreen[((y >> 3)*128) + x];
+    ucMask = 1 << (y & 7);
+    if (ucColor)
+        *d |= ucMask;
+    else
+        *d &= ~ucMask;
+} /* DrawScaledPixel() */
+//
+// For drawing filled ellipses
+//
+static void DrawScaledLine(SSOLED *pOLED, int iCX, int iCY, int x, int y, int32_t iXFrac, int32_t iYFrac, uint8_t ucColor)
+{
+    int iLen, x2;
+    uint8_t *d, ucMask;
+    if (iXFrac != 0x10000) x = ((x * iXFrac) >> 16);
+    if (iYFrac != 0x10000) y = ((y * iYFrac) >> 16);
+    iLen = x*2;
+    x = iCX - x; y += iCY;
+    x2 = x + iLen;
+    if (y < 0 || y >= pOLED->oled_y)
+        return; // completely off the screen
+    if (x < 0) x = 0;
+    if (x2 >= pOLED->oled_x) x2 = pOLED->oled_x-1;
+    iLen = x2 - x + 1; // new length
+    d = &pOLED->ucScreen[((y >> 3)*128) + x];
+    ucMask = 1 << (y & 7);
+    if (ucColor) // white
+    {
+        for (; iLen > 0; iLen--)
+            *d++ |= ucMask;
+    }
+    else // black
+    {
+        for (; iLen > 0; iLen--)
+            *d++ &= ~ucMask;
+    }
+} /* DrawScaledLine() */
+//
+// Draw the 8 pixels around the Bresenham circle
+// (scaled to make an ellipse)
+//
+static void BresenhamCircle(SSOLED *pOLED, int iCX, int iCY, int x, int y, int32_t iXFrac, int32_t iYFrac, uint8_t ucColor, uint8_t bFill)
+{
+    if (bFill) // draw a filled ellipse
+    {
+        // for a filled ellipse, draw 4 lines instead of 8 pixels
+        DrawScaledLine(pOLED, iCX, iCY, x, y, iXFrac, iYFrac, ucColor);
+        DrawScaledLine(pOLED, iCX, iCY, x, -y, iXFrac, iYFrac, ucColor);
+        DrawScaledLine(pOLED, iCX, iCY, y, x, iXFrac, iYFrac, ucColor);
+        DrawScaledLine(pOLED, iCX, iCY, y, -x, iXFrac, iYFrac, ucColor);
+    }
+    else // draw 8 pixels around the edges
+    {
+        DrawScaledPixel(pOLED, iCX, iCY, x, y, iXFrac, iYFrac, ucColor);
+        DrawScaledPixel(pOLED, iCX, iCY, -x, y, iXFrac, iYFrac, ucColor);
+        DrawScaledPixel(pOLED, iCX, iCY, x, -y, iXFrac, iYFrac, ucColor);
+        DrawScaledPixel(pOLED, iCX, iCY, -x, -y, iXFrac, iYFrac, ucColor);
+        DrawScaledPixel(pOLED, iCX, iCY, y, x, iXFrac, iYFrac, ucColor);
+        DrawScaledPixel(pOLED, iCX, iCY, -y, x, iXFrac, iYFrac, ucColor);
+        DrawScaledPixel(pOLED, iCX, iCY, y, -x, iXFrac, iYFrac, ucColor);
+        DrawScaledPixel(pOLED, iCX, iCY, -y, -x, iXFrac, iYFrac, ucColor);
+    }
+} /* BresenhamCircle() */
+
+//
+// Draw an outline or filled ellipse
+//
+void oledEllipse(SSOLED *pOLED, int iCenterX, int iCenterY, int32_t iRadiusX, int32_t iRadiusY, uint8_t ucColor, uint8_t bFilled)
+{
+    int32_t iXFrac, iYFrac;
+    int iRadius, iDelta, x, y;
+    
+    if (pOLED == NULL || pOLED->ucScreen == NULL)
+        return; // must have back buffer defined
+    if (iRadiusX <= 0 || iRadiusY <= 0) return; // invalid radii
+    
+    if (iRadiusX > iRadiusY) // use X as the primary radius
+    {
+        iRadius = iRadiusX;
+        iXFrac = 65536;
+        iYFrac = (iRadiusY * 65536) / iRadiusX;
+    }
+    else
+    {
+        iRadius = iRadiusY;
+        iXFrac = (iRadiusX * 65536) / iRadiusY;
+        iYFrac = 65536;
+    }
+    iDelta = 3 - (2 * iRadius);
+    x = 0; y = iRadius;
+    while (x <= y)
+    {
+        BresenhamCircle(pOLED, iCenterX, iCenterY, x, y, iXFrac, iYFrac, ucColor, bFilled);
+        x++;
+        if (iDelta < 0)
+        {
+            iDelta += (4*x) + 6;
+        }
+        else
+        {
+            iDelta += 4 * (x-y) + 10;
+            y--;
+        }
+    }
+} /* oledEllipse() */
+//
+// Draw an outline or filled rectangle
+//
+void oledRectangle(SSOLED *pOLED, int x1, int y1, int x2, int y2, uint8_t ucColor, uint8_t bFilled)
+{
+    uint8_t *d, ucMask, ucMask2;
+    int tmp, iOff;
+    if (pOLED == NULL || pOLED->ucScreen == NULL)
+        return; // only works with a back buffer
+    if (x1 < 0 || y1 < 0 || x2 < 0 || y2 < 0 ||
+       x1 >= pOLED->oled_x || y1 >= pOLED->oled_y || x2 >= pOLED->oled_x || y2 >= pOLED->oled_y) return; // invalid coordinates
+    // Make sure that X1/Y1 is above and to the left of X2/Y2
+    // swap coordinates as needed to make this true
+    if (x2 < x1)
+    {
+        tmp = x1;
+        x1 = x2;
+        x2 = tmp;
+    }
+    if (y2 < y1)
+    {
+        tmp = y1;
+        y1 = y2;
+        y2 = tmp;
+    }
+    if (bFilled)
+    {
+        int x, y, iMiddle;
+        iMiddle = (y2 >> 3) - (y1 >> 3);
+        ucMask = 0xff << (y1 & 7);
+        if (iMiddle == 0) // top and bottom lines are in the same row
+            ucMask &= (0xff >> (7-(y2 & 7)));
+        d = &pOLED->ucScreen[(y1 >> 3)*128 + x1];
+        // Draw top
+        for (x = x1; x <= x2; x++)
+        {
+            if (ucColor)
+                *d |= ucMask;
+            else
+                *d &= ~ucMask;
+            d++;
+        }
+        if (iMiddle > 1) // need to draw middle part
+        {
+            ucMask = (ucColor) ? 0xff : 0x00;
+            for (y=1; y<iMiddle; y++)
+            {
+                d = &pOLED->ucScreen[(y1 >> 3)*128 + x1 + (y*128)];
+                for (x = x1; x <= x2; x++)
+                    *d++ = ucMask;
+            }
+        }
+        if (iMiddle >= 1) // need to draw bottom part
+        {
+            ucMask = 0xff >> (7-(y2 & 7));
+            d = &pOLED->ucScreen[(y2 >> 3)*128 + x1];
+            for (x = x1; x <= x2; x++)
+            {
+                if (ucColor)
+                    *d++ |= ucMask;
+                else
+                    *d++ &= ~ucMask;
+            }
+        }
+    }
+    else // outline
+    {
+      // see if top and bottom lines are within the same byte rows
+        d = &pOLED->ucScreen[(y1 >> 3)*128 + x1];
+        if ((y1 >> 3) == (y2 >> 3))
+        {
+            ucMask2 = 0xff << (y1 & 7);  // L/R end masks
+            ucMask = 1 << (y1 & 7);
+            ucMask |= 1 << (y2 & 7);
+            ucMask2 &= (0xff >> (7-(y2  & 7)));
+            if (ucColor)
+            {
+                *d++ |= ucMask2; // start
+                x1++;
+                for (; x1 < x2; x1++)
+                    *d++ |= ucMask;
+                if (x1 <= x2)
+                    *d++ |= ucMask2; // right edge
+            }
+            else
+            {
+                *d++ &= ~ucMask2;
+                x1++;
+                for (; x1 < x2; x1++)
+                    *d++ &= ~ucMask;
+                if (x1 <= x2)
+                    *d++ &= ~ucMask2; // right edge
+            }
+        }
+        else
+        {
+            int y;
+            // L/R sides
+            iOff = (x2 - x1);
+            ucMask = 1 << (y1 & 7);
+            for (y=y1; y <= y2; y++)
+            {
+                if (ucColor) {
+                    *d |= ucMask;
+                    d[iOff] |= ucMask;
+                } else {
+                    *d &= ~ucMask;
+                    d[iOff] &= ~ucMask;
+                }
+                ucMask <<= 1;
+                if  (ucMask == 0) {
+                    ucMask = 1;
+                    d += 128;
+                }
+            }
+            // T/B sides
+            ucMask = 1 << (y1 & 7);
+            ucMask2 = 1 << (y2 & 7);
+            x1++;
+            d = &pOLED->ucScreen[(y1 >> 3)*128 + x1];
+            iOff = (y2 >> 3) - (y1 >> 3);
+            iOff *= 128;
+            for (; x1 < x2; x1++)
+            {
+                if (ucColor) {
+                    *d |= ucMask;
+                    d[iOff] |= ucMask2;
+                } else {
+                    *d &= ~ucMask;
+                    d[iOff] &= ~ucMask2;
+                }
+                d++;
+            }
+        }
+    } // outline
+} /* oledRectangle() */
