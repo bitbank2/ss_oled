@@ -778,6 +778,10 @@ int rc = OLED_NOT_FOUND;
     else
        return rc; // no display found!
   }
+  else
+  {
+    pOLED->oled_addr = iAddr;
+  }
   // Reset it
   if (iResetPin != -1)
   {
