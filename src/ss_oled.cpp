@@ -764,6 +764,19 @@ int rc = OLED_NOT_FOUND;
   iCSPin = iDCPin = -1;
 
   I2CInit(&pOLED->bbi2c, iSpeed); // on Linux, SDA = bus number, SCL = device address
+  
+  // Reset it
+  if (iResetPin != -1)
+  {
+    pinMode(iResetPin, OUTPUT);
+    digitalWrite(iResetPin, HIGH);
+    delay(50);
+    digitalWrite(iResetPin, LOW);
+    delay(50);
+    digitalWrite(iResetPin, HIGH);
+    delay(10);
+  }
+  
 #ifdef _LINUX_
   pOLED->oled_addr = (uint8_t)scl;
 #else
@@ -782,17 +795,7 @@ int rc = OLED_NOT_FOUND;
   {
     pOLED->oled_addr = iAddr;
   }
-  // Reset it
-  if (iResetPin != -1)
-  {
-    pinMode(iResetPin, OUTPUT);
-    digitalWrite(iResetPin, HIGH);
-    delay(50);
-    digitalWrite(iResetPin, LOW);
-    delay(50);
-    digitalWrite(iResetPin, HIGH);
-    delay(10);
-  }
+  
 #endif
   // Detect the display controller (SSD1306, SH1107 or SH1106)
   uint8_t u = 0;
