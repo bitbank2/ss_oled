@@ -82,10 +82,6 @@ void oledSPIInit(int iType, int iDC, int iCS, int iReset, int bFlip, int bInvert
 //
 void oledSetBackBuffer(SSOLED *pOLED, uint8_t *pBuffer);
 //
-// Sends a command to turn off the OLED display
-//
-void oledShutdown(SSOLED *pOLED);
-//
 // Sets the brightness (0=off, 255=brightest)
 //
 void oledSetContrast(SSOLED *pOLED, unsigned char ucContrast);

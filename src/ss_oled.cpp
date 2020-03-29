@@ -652,21 +652,6 @@ static void oledCachedWrite(uint8_t *pData, uint8_t bLen)
   
 } /* oledCachedWrite() */
 #endif // FUTURE
-//
-// Turn off the display
-//
-void oledShutdown(SSOLED *pOLED)
-{
-uint8_t uc[2];
-
-    uc[0] = 0; // command
-    uc[1] = 0xae; // display off
-    _I2CWrite(pOLED, uc, 2);
-#ifdef _LINUX_
-    close(file_i2c);
-    file_i2c = 0;
-#endif
-} /* oledShutdown() */
 #if !defined( __AVR_ATtiny85__ ) && !defined( _LINUX_ )
 //
 // Initialize the OLED controller for SPI mode
