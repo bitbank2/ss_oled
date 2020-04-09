@@ -32,7 +32,6 @@
 #define false 0
 #define true 1
 #define memcpy_P memcpy
-static int file_i2c = 0;
 
 #else // Arduino
 
@@ -40,7 +39,6 @@ static int file_i2c = 0;
 #ifdef __AVR__
 #include <avr/pgmspace.h>
 #endif
-//#include <BitBang_I2C.h>
 #ifndef __AVR_ATtiny85__
 #include <SPI.h>
 #endif
@@ -570,27 +568,27 @@ static int16_t pgm_read_word(uint8_t *ptr)
 int I2CReadRegister(BBI2C *pI2C, uint8_t addr, uint8_t reg, uint8_t *pBuf, int iLen)
 {
 int rc;
-  rc = write(file_i2c, &reg, 1);
-  rc = read(file_i2c, pBuf, iLen);
+  rc = write(pI2C->file_i2c, &reg, 1);
+  rc = read(pI2C->file_i2c, pBuf, iLen);
   return (rc > 0);
 }
 int I2CRead(BBI2C *pI2C, uint8_t addr, uint8_t *pBuf, int iLen)
 {
 int rc;
-  rc = read(file_i2c, pBuf, iLen);
+  rc = read(pI2C->file_i2c, pBuf, iLen);
   return (rc > 0);
 }
 int I2CInit(BBI2C *pI2C, int32_t iSpeed)
 {
 char filename[32];
 
-  sprintf(filename, "/dev/i2c-%d", iSDAPin); // I2C bus number passed in SDA pin
-  if ((file_i2c = open(filename, O_RDWR)) < 0)
+  sprintf(filename, "/dev/i2c-%d", pI2C->iBus); // I2C bus number
+  if ((pI2C->file_i2c = open(filename, O_RDWR)) < 0)
      return 1;
-  if (ioctl(file_i2c, I2C_SLAVE, iSCLPin) < 0) // set slave address
+  if (ioctl(pI2C->file_i2c, I2C_SLAVE, pI2C->iAddr) < 0) // set slave address
   {
-     close(file_i2c);
-     file_i2c = 0;
+     close(pI2C->file_i2c);
+     pI2C->file_i2c = 0;
      return 1;
   }
   return 0;
@@ -599,9 +597,9 @@ char filename[32];
 
 // Wrapper function to write I2C data
 #ifdef _LINUX_
-static void _I2CWrite(BBI2C *pI2C, unsigned char *pData, int iLen)
+static void _I2CWrite(SSOLED *pOLED, unsigned char *pData, int iLen)
 {
-  write(file_i2c, pData, iLen);
+  write(pOLED->bbi2c.file_i2c, pData, iLen);
 }
 #else // Arduino
 static void _I2CWrite(SSOLED *pOLED, unsigned char *pData, int iLen)
@@ -741,9 +739,11 @@ int rc = OLED_NOT_FOUND;
   pOLED->oled_type = iType;
   pOLED->oled_flip = bFlip;
   pOLED->oled_wrap = 0; // default - disable text wrap
-  pOLED->bbi2c.iSDA = sda;
-  pOLED->bbi2c.iSCL = scl;
+  pOLED->bbi2c.iBus = sda; // bus number
+  pOLED->bbi2c.iAddr = iAddr; // I2C address
+#ifndef _LINUX_
   pOLED->bbi2c.bWire = bWire;
+#endif
   iResetPin = reset;
 // Disable SPI mode code
   iCSPin = iDCPin = -1;
@@ -751,6 +751,7 @@ int rc = OLED_NOT_FOUND;
   I2CInit(&pOLED->bbi2c, iSpeed); // on Linux, SDA = bus number, SCL = device address
   
   // Reset it
+#ifndef _LINUX_
   if (iResetPin != -1)
   {
     pinMode(iResetPin, OUTPUT);
@@ -761,6 +762,7 @@ int rc = OLED_NOT_FOUND;
     digitalWrite(iResetPin, HIGH);
     delay(10);
   }
+#endif
   
 #ifdef _LINUX_
   pOLED->oled_addr = (uint8_t)scl;

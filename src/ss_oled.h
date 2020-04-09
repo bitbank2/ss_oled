@@ -1,7 +1,16 @@
 #ifndef __SS_OLED_H__
 #define __SS_OLED_H__
 
+#ifdef _LINUX_
+typedef struct bbi2c
+{
+int file_i2c;
+int iBus;
+int iAddr;
+} BBI2C;
+#else
 #include <BitBang_I2C.h>
+#endif
 
 typedef struct ssoleds
 {

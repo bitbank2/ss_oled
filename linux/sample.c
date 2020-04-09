@@ -8,6 +8,9 @@
 #include <unistd.h>
 #include "ss_oled.h"
 
+SSOLED ssoled; // data structure for OLED object
+unsigned char ucBackBuf[1024];
+
 int main(int argc, char *argv[])
 {
 int i, iChannel;
@@ -20,23 +23,24 @@ int bFlip = 1, bInvert = 0;
 	while (i != 0 && iChannel < 2) // try I2C channel 0 through 2
 	{
 		iChannel++;
-		i=oledInit(iOLEDType, bFlip, bInvert, iChannel, iOLEDAddr, 0);
+		i=oledInit(&ssoled, iOLEDType, iOLEDAddr, bFlip, bInvert, 1, iChannel, -1, -1, 0);
 	}
 	if (i == 0)
 	{
 		printf("Successfully opened I2C bus %d\n", iChannel);
-		oledFill(0,1); // fill with black
-		oledWriteString(0,0,0,"OLED 96 Library!",FONT_NORMAL,0,1);
-		oledWriteString(0,3,1,"BIG!",FONT_LARGE,0,1);
-		oledWriteString(0,0,1,"Small", FONT_SMALL,0,1);
+                oledSetBackBuffer(&ssoled, ucBackBuf);
+		oledFill(&ssoled, 0,1); // fill with black
+		oledWriteString(&ssoled, 0,0,0,"OLED 96 Library!",FONT_NORMAL,0,1);
+		oledWriteString(&ssoled, 0,3,1,"BIG!",FONT_LARGE,0,1);
+		oledWriteString(&ssoled, 0,0,1,"Small", FONT_SMALL,0,1);
 		for (i=0; i<64; i++)
 		{
-			oledSetPixel(i, 16+i, 1, 1);
-			oledSetPixel(127-i, 16+i, 1, 1);
+			oledSetPixel(&ssoled, i, 16+i, 1, 1);
+			oledSetPixel(&ssoled, 127-i, 16+i, 1, 1);
 		}
 		printf("Press ENTER to quit\n");
 		getchar();
-		oledShutdown();
+		oledPower(&ssoled, 0);
 	}
 	else
 	{
