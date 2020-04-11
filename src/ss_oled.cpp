@@ -705,6 +705,8 @@ int rc = OLED_NOT_FOUND;
   pOLED->oled_wrap = 0; // default - disable text wrap
   pOLED->bbi2c.iBus = sda; // bus number
   pOLED->bbi2c.bWire = bWire;
+  pOLED->bbi2c.iSDA = sda;
+  pOLED->bbi2c.iSCL = scl;
   iResetPin = reset;
 // Disable SPI mode code
   iCSPin = iDCPin = -1;
