@@ -3,7 +3,7 @@ LIBS = -lss_oled -lpigpio -lBitBang_I2C -lm -lpthread
 
 all: sample
 
-sample: sample.o
+sample: sample.o libss_oled.a
 	$(CC) sample.o $(LIBS) -o sample
 
 sample.o: sample.c
