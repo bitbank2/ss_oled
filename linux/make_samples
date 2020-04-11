@@ -1,0 +1,25 @@
+CFLAGS=-c -Wall -O2 -D_LINUX_
+LIBS = -lss_oled -lpigpio -lBitBang_I2C -lm -lpthread
+
+all: sample multi speed
+
+speed: speed_test.o libss_oled.a
+	$(CC) speed_test.o $(LIBS) -o speed
+
+speed_test.o: speed_test.c
+	$(CC) $(CFLAGS) speed_test.c
+
+multi: multi_oled.o libss_oled.a
+	$(CC) multi_oled.o $(LIBS) -o multi
+
+multi_oled.o: multi_oled.c
+	$(CC) $(CFLAGS) multi_oled.c
+
+sample: sample.o libss_oled.a
+	$(CC) sample.o $(LIBS) -o sample
+
+sample.o: sample.c
+	$(CC) $(CFLAGS) sample.c
+
+clean:
+	rm *.o sample multi speed
