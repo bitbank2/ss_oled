@@ -1,5 +1,5 @@
 CFLAGS=-c -Wall -O2 -D_LINUX_
-LIBS = -lss_oled -lm -lpthread
+LIBS = -lss_oled -lpigpio -lBitBang_I2C -lm -lpthread
 
 all: sample
 

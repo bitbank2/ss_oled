@@ -23,7 +23,7 @@ int bFlip = 1, bInvert = 0;
 	while (i != 0 && iChannel < 2) // try I2C channel 0 through 2
 	{
 		iChannel++;
-		i=oledInit(&ssoled, iOLEDType, iOLEDAddr, bFlip, bInvert, 1, iChannel, -1, -1, 0);
+		i=oledInit(&ssoled, iOLEDType, iOLEDAddr, bFlip, bInvert, 1, iChannel, 0x3c, -1, 400000);
 	}
 	if (i == 0)
 	{

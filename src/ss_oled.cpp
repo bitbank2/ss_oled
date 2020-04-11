@@ -565,46 +565,11 @@ static int16_t pgm_read_word(uint8_t *ptr)
 {
   return ptr[0] + (ptr[1]<<8);
 }
-int I2CReadRegister(BBI2C *pI2C, uint8_t addr, uint8_t reg, uint8_t *pBuf, int iLen)
-{
-int rc;
-  rc = write(pI2C->file_i2c, &reg, 1);
-  rc = read(pI2C->file_i2c, pBuf, iLen);
-  return (rc > 0);
-}
-int I2CRead(BBI2C *pI2C, uint8_t addr, uint8_t *pBuf, int iLen)
-{
-int rc;
-  rc = read(pI2C->file_i2c, pBuf, iLen);
-  return (rc > 0);
-}
-int I2CInit(BBI2C *pI2C, int32_t iSpeed)
-{
-char filename[32];
-
-  sprintf(filename, "/dev/i2c-%d", pI2C->iBus); // I2C bus number
-  if ((pI2C->file_i2c = open(filename, O_RDWR)) < 0)
-     return 1;
-  if (ioctl(pI2C->file_i2c, I2C_SLAVE, pI2C->iAddr) < 0) // set slave address
-  {
-     close(pI2C->file_i2c);
-     pI2C->file_i2c = 0;
-     return 1;
-  }
-  return 0;
-}
 #endif // _LINUX_
 
-// Wrapper function to write I2C data
-#ifdef _LINUX_
 static void _I2CWrite(SSOLED *pOLED, unsigned char *pData, int iLen)
 {
-  write(pOLED->bbi2c.file_i2c, pData, iLen);
-}
-#else // Arduino
-static void _I2CWrite(SSOLED *pOLED, unsigned char *pData, int iLen)
-{
-#if !defined( __AVR_ATtiny85__ )
+#if !defined( _LINUX_ ) && !defined( __AVR_ATtiny85__ )
   if (iCSPin != -1) // we're writing to SPI, treat it differently
   {
     digitalWrite(iDCPin, (pData[0] == 0) ? LOW : HIGH); // data versus command
@@ -625,7 +590,6 @@ static void _I2CWrite(SSOLED *pOLED, unsigned char *pData, int iLen)
     I2CWrite(&pOLED->bbi2c, pOLED->oled_addr, pData, iLen);
   } // I2C
 } /* _I2CWrite() */
-#endif // _LINUX_
 
 #ifdef FUTURE
 static void oledCachedFlush(void)
@@ -740,10 +704,7 @@ int rc = OLED_NOT_FOUND;
   pOLED->oled_flip = bFlip;
   pOLED->oled_wrap = 0; // default - disable text wrap
   pOLED->bbi2c.iBus = sda; // bus number
-  pOLED->bbi2c.iAddr = iAddr; // I2C address
-#ifndef _LINUX_
   pOLED->bbi2c.bWire = bWire;
-#endif
   iResetPin = reset;
 // Disable SPI mode code
   iCSPin = iDCPin = -1;
@@ -764,9 +725,6 @@ int rc = OLED_NOT_FOUND;
   }
 #endif
   
-#ifdef _LINUX_
-  pOLED->oled_addr = (uint8_t)scl;
-#else
   // find the device address if requested
   if (iAddr == -1 || iAddr == 0 || iAddr == 0xff) // find it
   {
@@ -782,8 +740,6 @@ int rc = OLED_NOT_FOUND;
   {
     pOLED->oled_addr = iAddr;
   }
-  
-#endif
   // Detect the display controller (SSD1306, SH1107 or SH1106)
   uint8_t u = 0;
   I2CReadRegister(&pOLED->bbi2c, pOLED->oled_addr, 0x00, &u, 1); // read the status register
