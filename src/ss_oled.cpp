@@ -703,7 +703,9 @@ int rc = OLED_NOT_FOUND;
   pOLED->oled_type = iType;
   pOLED->oled_flip = bFlip;
   pOLED->oled_wrap = 0; // default - disable text wrap
+#ifdef _LINUX_
   pOLED->bbi2c.iBus = sda; // bus number
+#endif
   pOLED->bbi2c.bWire = bWire;
   pOLED->bbi2c.iSDA = sda;
   pOLED->bbi2c.iSCL = scl;
