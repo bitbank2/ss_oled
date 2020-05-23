@@ -121,6 +121,7 @@ void oledSetTextWrap(SSOLED *pOLED, int bWrap);
 //
 //  Returns 0 for success, -1 for invalid parameter
 //
+int oledWriteString(SSOLED *pOLED, int iScrollX, int x, int y, const __FlashStringHelper *ifsh, int iSize, int bInvert, int bRender);
 int oledWriteString(SSOLED *pOLED, int iScrollX, int x, int y, char *szMsg, int iSize, int bInvert, int bRender);
 //
 // Fill the frame buffer with a byte pattern
@@ -174,7 +175,7 @@ int oledScrollBuffer(SSOLED *pOLED, int iStartCol, int iEndCol, int iStartRow, i
 // If it goes beyond the left/right or top/bottom edges
 // it's trimmed to show the valid parts
 // This function requires a back buffer to be defined
-// The priority color (0 or 1) determines which color is painted 
+// The priority color (0 or 1) determines which color is painted
 // when a 1 is encountered in the source image.
 // e.g. when 0, the input bitmap acts like a mask to clear
 // the destination where bits are set.
@@ -203,4 +204,3 @@ void oledRectangle(SSOLED *pOLED, int x1, int y1, int x2, int y2, uint8_t ucColo
 #endif // _LINUX_
 
 #endif // __SS_OLED_H__
-
