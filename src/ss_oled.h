@@ -23,11 +23,16 @@ extern "C" {
 
 // 4 possible font sizes: 8x8, 16x32, 6x8, 16x16 (stretched from 8x8)
 enum {
-   FONT_NORMAL = 0,
-   FONT_LARGE,
-   FONT_SMALL,
-   FONT_STRETCHED
+   FONT_6x8 = 0,
+   FONT_8x8,
+   FONT_12x16,
+   FONT_16x16,
+   FONT_16x32
 };
+#define FONT_NORMAL FONT_8x8
+#define FONT_SMALL FONT_6x8
+#define FONT_LARGE FONT_16x32
+#define FONT_STRETCHED FONT_16x16
 #endif
 
 // OLED type for init function
