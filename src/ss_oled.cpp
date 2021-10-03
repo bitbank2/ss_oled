@@ -2046,6 +2046,98 @@ void oledDrawLine(SSOLED *pOLED, int x1, int y1, int x2, int y2, int bRender)
 } /* oledDrawLine() */
 
 //
+// Draw a string with a fractional scale in both dimensions
+// the scale is a 16-bit integer with and 8-bit fraction and 8-bit mantissa
+// To draw at 1x scale, set the scale factor to 256. To draw at 2x, use 512
+// The output must be drawn into a memory buffer, not directly to the display
+//
+int oledScaledString(SSOLED *pOLED, int x, int y, char *szMsg, int iSize, int bInvert, int iXScale, int iYScale, int iRotation)
+{
+uint32_t row, col, dx, dy;
+uint32_t sx, sy;
+uint8_t c, uc, color, *d;
+const uint8_t *s;
+uint8_t ucTemp[16];
+int tx, ty, bit, iFontOff;
+int iPitch, iOffset;
+int iFontWidth;
+
+   if (iXScale == 0 || iYScale == 0 || szMsg == NULL || pOLED == NULL || pOLED->ucScreen == NULL || x < 0 || y < 0 || x >= pOLED->oled_x-1 || y >= pOLED->oled_y-1)
+      return -1; // invalid display structure
+   if (iSize != FONT_8x8 && iSize != FONT_6x8)
+      return -1; // only on the small fonts (for now)
+   iFontWidth = (iSize == FONT_6x8) ? 6:8;
+   s = (iSize == FONT_6x8) ? ucSmallFont : ucFont;
+   iPitch = pOLED->oled_x;
+   dx = (iFontWidth * iXScale) >> 8; // width of each character
+   dy = (8 * iYScale) >> 8; // height of each character
+   sx = 65536 / iXScale; // turn the scale into an accumulator value
+   sy = 65536 / iYScale;
+   while (*szMsg) {
+      c = *szMsg++; // debug - start with normal font
+      iFontOff = (int)(c-32) * (iFontWidth-1);
+      // we can't directly use the pointer to FLASH memory, so copy to a local buffer
+      ucTemp[0] = 0; // first column is blank
+      memcpy_P(&ucTemp[1], &s[iFontOff], iFontWidth-1);
+      if (bInvert) InvertBytes(ucTemp, iFontWidth);
+      col = 0;
+      for (tx=0; tx<(int)dx; tx++) {
+         row = 0;
+         uc = ucTemp[col >> 8];
+         for (ty=0; ty<(int)dy; ty++) {
+            int nx, ny;
+            bit = row >> 8;
+            color = (uc & (1 << bit)); // set or clear the pixel
+            switch (iRotation) {
+               case ROT_0:
+                  nx = x + tx;
+                  ny = y + ty;
+                  break;
+               case ROT_90:
+                  nx = x - ty;
+                  ny = y + tx;
+                  break;
+               case ROT_180:
+                  nx = x - tx;
+                  ny = y - ty;
+                  break;
+               case ROT_270:
+                  nx = x + ty;
+                  ny = y - tx;
+                  break;
+            } // switch on rotation direction
+            // plot the pixel if it's within the image boundaries
+            if (nx >= 0 && ny >= 0 && nx < pOLED->oled_x && ny < pOLED->oled_y) {
+               d = &pOLED->ucScreen[(ny >> 3) * iPitch + nx];
+               if (color)
+                  d[0] |= (1 << (ny & 7));
+               else
+                  d[0] &= ~(1 << (ny & 7));
+            }
+            row += sy; // add fractional increment to source row of character
+         } // for ty
+         col += sx; // add fractional increment to source column
+      } // for tx
+      // update the 'cursor' position
+      switch (iRotation) {
+         case ROT_0:
+            x += dx;
+            break;
+         case ROT_90:
+            y += dx;
+            break;
+         case ROT_180:
+            x -= dx;
+            break;
+         case ROT_270:
+            y -= dx;
+            break;
+      } // switch on rotation
+   } // while (*szMsg)
+   return 0;
+} /* oledScaledString() */
+
+//
 // For drawing ellipses, a circle is drawn and the x and y pixels are scaled by a 16-bit integer fraction
 // This function draws a single pixel and scales its position based on the x/y fraction of the ellipse
 //

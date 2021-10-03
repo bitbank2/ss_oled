@@ -34,6 +34,7 @@ Features:<br>
 - Text cursor position with optional line wrap<br>
 - a function to load a Windows BMP file<br>
 - Pixel drawing on SH1106/7 without needing backing RAM<br>
+- Draw text into the back buffer at any scale and rotation (in 90 deg increments)<br>
 - Optimized Bresenham line drawing<br>
 - Optimized Bresenham outline and filled ellipse drawing<br>
 - Optimized outline and filled rectangle drawing<br>

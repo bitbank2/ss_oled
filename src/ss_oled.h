@@ -29,6 +29,14 @@ enum {
    FONT_16x16,
    FONT_16x32
 };
+// 4 possible rotation angles for oledScaledString()
+enum {
+   ROT_0=0,
+   ROT_90,
+   ROT_180,
+   ROT_270
+};
+
 #define FONT_NORMAL FONT_8x8
 #define FONT_SMALL FONT_6x8
 #define FONT_LARGE FONT_16x32
@@ -127,6 +135,13 @@ void oledSetTextWrap(SSOLED *pOLED, int bWrap);
 //  Returns 0 for success, -1 for invalid parameter
 //
 int oledWriteString(SSOLED *pOLED, int iScrollX, int x, int y, char *szMsg, int iSize, int bInvert, int bRender);
+//
+// Draw a string with a fractional scale in both dimensions
+// the scale is a 16-bit integer with and 8-bit fraction and 8-bit mantissa
+// To draw at 1x scale, set the scale factor to 256. To draw at 2x, use 512
+// The output must be drawn into a memory buffer, not directly to the display
+//
+int oledScaledString(SSOLED *pOLED, int x, int y, char *szMsg, int iSize, int bInvert, int iXScale, int iYScale, int iRotation);
 //
 // Fill the frame buffer with a byte pattern
 // e.g. all off (0x00) or all on (0xff)
