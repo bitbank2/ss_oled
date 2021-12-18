@@ -173,6 +173,11 @@ int oledDrawGFX(SSOLED *pOLED, uint8_t *pSrc, int iSrcCol, int iSrcRow, int iDes
 // Draw a line between 2 points
 //
 void oledDrawLine(SSOLED *pOLED, int x1, int y1, int x2, int y2, int bRender);
+
+//
+// Clear a line between 2 points -- added new function to maintain compatibility between releases
+//
+void oledClearLine(SSOLED *pOLED, int x1, int y1, int x2, int y2, int bRender);
 //
 // Play a frame of animation data
 // The animation data is assumed to be encoded for a full frame of the display
