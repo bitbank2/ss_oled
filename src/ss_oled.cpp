@@ -2045,6 +2045,133 @@ void oledDrawLine(SSOLED *pOLED, int x1, int y1, int x2, int y2, int bRender)
   } // y major case
 } /* oledDrawLine() */
 
+void oledClearLine(SSOLED *pOLED, int x1, int y1, int x2, int y2, int bRender)
+{
+  int temp;
+  int dx = x2 - x1;
+  int dy = y2 - y1;
+  int error;
+  uint8_t *p, *pStart, mask, bOld, bNew;
+  int xinc, yinc;
+  int y, x;
+  
+  if (x1 < 0 || x2 < 0 || y1 < 0 || y2 < 0 || x1 >= pOLED->oled_x || x2 >= pOLED->oled_x || y1 >= pOLED->oled_y || y2 >= pOLED->oled_y)
+     return;
+
+  if(abs(dx) > abs(dy)) {
+    // X major case
+    if(x2 < x1) {
+      dx = -dx;
+      temp = x1;
+      x1 = x2;
+      x2 = temp;
+      temp = y1;
+      y1 = y2;
+      y2 = temp;
+    }
+
+    y = y1;
+    dy = (y2 - y1);
+    error = dx >> 1;
+    yinc = 1;
+    if (dy < 0)
+    {
+      dy = -dy;
+      yinc = -1;
+    }
+    p = pStart = &pOLED->ucScreen[x1 + ((y >> 3) << 7)]; // point to current spot in back buffer
+    mask = 1 << (y & 7); // current bit offset
+    for(x=x1; x1 <= x2; x1++) {
+      *p++ |= mask; // set pixel and increment x pointer
+      error -= dy;
+      if (error < 0)
+      {
+        error += dx;
+        if (yinc > 0)
+           mask <<= 1;
+        else
+           mask >>= 1;
+        if (mask == 0) // we've moved outside the current row, write the data we changed
+        {
+           oledSetPosition(pOLED, x, y>>3, bRender);
+           oledWriteDataBlock(pOLED, pStart,  (int)(p-pStart), bRender); // write the row we changed
+           x = x1+1; // we've already written the byte at x1
+           y1 = y+yinc;
+           p += (yinc > 0) ? 128 : -128;
+           pStart = p;
+           mask = 1 << (y1 & 7);
+        }
+        y += yinc;
+      }
+    } // for x1    
+   if (p != pStart) // some data needs to be written
+   {
+     oledSetPosition(pOLED, x, y>>3, bRender);
+     oledWriteDataBlock(pOLED, pStart, (int)(p-pStart), bRender);
+   }
+  }
+  else {
+    // Y major case
+    if(y1 > y2) {
+      dy = -dy;
+      temp = x1;
+      x1 = x2;
+      x2 = temp;
+      temp = y1;
+      y1 = y2;
+      y2 = temp;
+    } 
+
+    p = &pOLED->ucScreen[x1 + ((y1 >> 3) * 128)]; // point to current spot in back buffer
+    bOld = bNew = p[0]; // current data at that address
+    mask = 1 << (y1 & 7); // current bit offset
+    dx = (x2 - x1);
+    error = dy >> 1;
+    xinc = 1;
+    if (dx < 0)
+    {
+      dx = -dx;
+      xinc = -1;
+    }
+    for(x = x1; y1 <= y2; y1++) {
+      bNew &= mask; // set the pixel
+      error -= dx;
+      mask <<= 1; // y1++
+      if (mask == 0) // we're done with this byte, write it if necessary
+      {
+        if (bOld != bNew)
+        {
+          p[0] = bNew; // save to RAM
+          oledSetPosition(pOLED, x, y1>>3, bRender);
+          oledWriteDataBlock(pOLED, &bNew, 1, bRender);
+        }
+        p += 128; // next line
+        bOld = bNew = p[0];
+        mask = 1; // start at LSB again
+      }
+      if (error < 0)
+      {
+        error += dy;
+        if (bOld != bNew) // write the last byte we modified if it changed
+        {
+          p[0] = bNew; // save to RAM
+          oledSetPosition(pOLED, x, y1>>3, bRender);
+          oledWriteDataBlock(pOLED, &bNew, 1, bRender);
+        }
+        p += xinc;
+        x += xinc;
+        bOld = bNew = p[0];
+      }
+    } // for y
+    if (bOld != bNew) // write the last byte we modified if it changed
+    {
+      p[0] = bNew; // save to RAM
+      oledSetPosition(pOLED, x, y2>>3, bRender);
+      oledWriteDataBlock(pOLED, &bNew, 1, bRender);
+    }
+  } // y major case
+} /* oledClearLine() */
+
 //
 // Draw a string with a fractional scale in both dimensions
 // the scale is a 16-bit integer with and 8-bit fraction and 8-bit mantissa
